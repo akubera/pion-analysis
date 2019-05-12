@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+#
+# rm-merged
+#
+
+import sys
+import re
+
+import os
+from pprint import pprint
+import subprocess as sp
+from pathlib import Path
+from functools import partial
+# from subprocess import run, PIPE
+from zipfile import ZipFile, ZIP_BZIP2
+
+
+from tqdm import tqdm
+
+
+run = partial(sp.Popen, stdout=sp.PIPE, encoding='utf-8')
+
+
+def argparser():
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("-o", "--output",
+                        default=None,
+                        help="Output file")
+    parser.add_argument("--ignore",
+                        action='store_true',
+                        help='this option is ignored')
+    parser.add_argument('masterjob')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = argparser().parse_args(argv)
+    print('removing source files for masterjob', args.masterjob)
+
+    env = os.environ.copy()
+
+    wh = sp.Popen(['/usr/bin/which', 'gbbox'])
+    wh.wait()
+    module = 'AliROOT/latest'
+    if wh.returncode != 0:
+        print("Not in python environment... loading %s" % module, end=' ')
+        module_dir = os.path.expandvars('$ALIBUILD_WORK_DIR/MODULES/ubuntu1804_x86-64')
+
+        os.environ['MODULEPATH'] = ':'.join([module_dir, *os.environ.get('MODULEPATH', '').split(':')])
+        cmd = run(['modulecmd', 'python', 'load', module])
+        cmd_out, *_ = cmd.communicate()
+        exec(cmd_out)
+        print("OK")
+        # return 0
+
+    cmd = run(['gbbox', 'ps', '-As', f'-id={args.masterjob}'])
+    cmd_out, *_ = cmd.communicate()
+    jl = JobList(cmd_out)
+
+    for pid in jl.done():
+        print(pid)
+        cmd = run(['alien_ps', '-jdl', pid])
+        cmd_out, *_ = cmd.communicate()
+        print(cmd_out)
+
+        m = re.search(r"InputData\s=\s+{([^}]+)}", cmd_out, re.M)
+        print(m)
+        print(m.group(1))
+
+        break
+
+    return 0
+
+    jdl_archive = Path(args.output or 'jdl-index.bz2')
+    if jdl_archive.suffix == '.bz2':
+        compression = ZIP_BZIP2
+    else:
+        compression = None
+
+    with ZipFile(jdl_archive, 'a', compression=compression) as zfile:
+        for pid in jl.running():
+            subjobs = JobList.FromCommand('gbbox ps -As -id=%s' % pid)
+            subjobs_done = set(subjobs.done())
+            saved_pids = set(zfile.namelist())
+
+            missing_pids = subjobs_done - saved_pids
+            for pid in tqdm(missing_pids):
+                # run.jobs()
+
+                cmd = run(['alien_ps', '-jdl', pid])
+                jdl_txt, *_ = cmd.communicate()
+                # for pid, jjdl in jdl_txt:
+                zfile.writestr('%s/jdl' % pid, jdl_txt)
+
+                cmd = run(['alien_ps', '-trace', pid])
+                trace_txt, *_ = cmd.communicate()
+                # for pid, jjdl in trace_txt:
+                zfile.writestr('%s/trace' % pid, trace_txt)
+
+                cmd = run(['alien_kill', pid])
+                cmd.wait()
+
+    return
+    print("Loading processes")
+    cmd = run(['gbbox', 'ps', '-s', '-X'])
+    cmd_out, *_ = cmd.communicate()
+    print(cmd_out)
+    # print('---')
+    # print(os.environ['PATH'])
+    # print('---')
+    # print(os.environ['PATH'])
+
+    ls = sp.Popen(['ls', '-l', '--color=always'], stdout=sp.PIPE)  # capture_output=True)
+    # ls = sp.Popen(['ls', '-l'], stdout=sp.PIPE)  #, capture_output=True)
+    print(ls)
+
+
+    ls_out, _ = ls.communicate()
+    print(ls_out.decode())
+
+
+class JobList:
+
+    REGEX = re.compile(r"""
+                        (?P<user>[a-z]+)
+                        \s+
+                        (?P<splitjob>-)?
+                        (?P<pid>[0-9]+)
+                        \s+
+                        (?P<status>[A-Z]{1,2})
+                        \s+
+                        (?P<runtime>[0-9:]+)?
+                        \s+
+                        (?P<path>\S+)
+                       """, re.X)
+
+    def __init__(self, text):
+
+        self.jobs = [row.groupdict()
+                     for row in self.REGEX.finditer(text)]
+
+    def running(self):
+        return [j['pid']
+                for j in self.jobs
+                if j['status'] in ('RS', 'R')]
+
+    def done(self):
+        return [j['pid']
+                for j in self.jobs
+                if j['status'] in ('D', 'DW')]
+
+    @classmethod
+    def FromCommand(cls, args):
+        cmd = run(args.split())
+        cmd_out, *_ = cmd.communicate()
+        print(cmd_out)
+        return cls(cmd_out)
+
+
+if __name__ == "__main__":
+    exit(main())
