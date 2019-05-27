@@ -1,0 +1,102 @@
+#!/usr/bin/env python
+#
+#
+#
+
+import re
+import sys
+from pathlib import Path
+from itertools import islice
+
+import sh
+from tqdm import tqdm
+from toolz.itertoolz import partition_all
+
+
+from multiprocessing import Pool
+from zipfile import ZipFile, ZIP_BZIP2
+from pprint import pprint
+
+
+def arg_parser():
+    from argparse import ArgumentParser
+    p = ArgumentParser()
+    # p.add_argument("grid_xml_file")
+    # p.add_argument("--stage", type=int, default=1)
+    p.add_argument("masterjob")
+    # p.add_argument("--stage", type=int, default=1)
+    return p
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+
+    from ROOT import TFile, TAlien, TAlienFile
+
+    alien = TAlien.Connect("alien://")
+    if not alien.IsConnected() or alien.GetPort() == 0:
+        print("Could not connect", file=sys.stderr)
+        return 1
+
+    masterjob = args.masterjob
+    jdl_archive = Path('jobs.bz2')
+    print(args.masterjob)
+
+    index_path = Path('jdls-%s-index.txt' % masterjob)
+
+    try:
+        ps_cmd = sh.gbbox.ps('-TAs', '-id=%s' % masterjob)
+    except sh.ErrorReturnCode_1 as e:
+        ps_cmd = e
+    txt = ps_cmd.stdout.decode()
+
+    if jdl_archive.suffix == '.bz2':
+        compression = ZIP_BZIP2
+    else:
+        compression = None  # default
+
+    done_pids = {a.jobid for a in Match.IterFrom(txt)}
+
+    grid_home = Path(alien.GetHomeDirectory())
+    xml_path = f"{grid_home}/{args.grid_xml_file}/output/Stage_{args.stage}.xml"
+
+    print("Loading xml", xml_path)
+    env = environ.copy()
+    env['alien_MODE'] = "GRID"
+    proc = sh.alien_cat(xml_path, _env=env)
+    xml_txt = proc.stdout.decode()
+
+    stage_xml = ElementTree.fromstring(xml_txt)
+
+    paths = [Path(f.attrib['lfn']).parent
+             for f in stage_xml.findall("collection/event/file")]
+
+    with tqdm(total=len(paths)) as pbar:
+        for dirs in partition_all(20, paths):
+            dirs_str = ' '.join(map(str, dirs))
+            try:
+                sh.alien_rmdir(dirs_str)
+            except sh.ErrorReturnCode_1:
+                pass
+            pbar.update(len(dirs))
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+
+def foo(_):
+    from time import sleep
+    sleep(1)
+
+p = Pool()
+jobs = p.map_async(foo, range(3))
+
+print(p._processes)
+print(p._state)
+p.wait()
+print(jobs)
