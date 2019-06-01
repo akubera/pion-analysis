@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+#
+# fetch-and-kill
+#
+
+import os
+import sys
+import re
+import logging
+import subprocess as sp
+
+from pathlib import Path
+from pprint import pprint
+from functools import partial
+from zipfile import ZipFile, ZIP_BZIP2
+
+
+run = partial(sp.Popen, stdout=sp.PIPE, encoding='utf-8')
+
+logging.basicConfig()
+log = logging.getLogger()
+
+
+def argparser():
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("-o", "--output",
+                        default=None,
+                        help="Output file")
+    parser.add_argument("--ignore",
+                        action='store_true',
+                        help='this option is ignored')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = argparser().parse_args(argv)
+
+    # print(">>", os.environ['MODULEPATH'])
+    # # print(">>", os.environ['PATH'])
+    # # cmd = sp.Popen(['py', 'print(os.environ["MODULEPATH"])'], stdout=sp.PIPE, encoding='utf-8')
+    # cmd = run('py print(os.environ["MODULEPATH"])'.split())
+    # cmd_out, *_ = cmd.communicate()
+    # print(">>", cmd_out)
+    # return
+
+    env = os.environ.copy()
+
+    wh = sp.Popen(['/usr/bin/which', 'gbbox'], stdout=sp.PIPE)
+    wh.wait()
+    module = 'AliRoot/latest'
+    if wh.returncode != 0:
+        log.warn("Not in ALICE environment... loading %s", module)
+        module_dir = os.path.expandvars('$ALIBUILD_WORK_DIR/MODULES/ubuntu1804_x86-64')
+
+        module_path = [module_dir, *os.environ.get('MODULEPATH', '').split(':')]
+        os.environ['MODULEPATH'] = ':'.join(module_path)
+        cmd = run(['modulecmd', 'python', 'load', module])
+        cmd_out, *_ = cmd.communicate()
+        exec(cmd_out)
+        print("OK")
+        # return 0
+
+    from tqdm import tqdm
+
+    cmd = run(['gbbox', 'ps', '-A'])
+    cmd_out, *_ = cmd.communicate()
+    jl = JobList(cmd_out)
+    # print(cmd_out)
+    # pprint(dict(os.environ))
+    jdl_archive = Path(args.output or 'jdl-index.bz2')
+
+    if jdl_archive.suffix == '.bz2':
+        compression = ZIP_BZIP2
+    else:
+        compression = None
+
+    with ZipFile(jdl_archive, 'a', compression=compression) as zfile:
+        for mpid in jl.running():
+        #for mpid in jl.done():
+            subjobs = JobList.FromCommand('gbbox ps -As -id=%s' % mpid)
+            subjobs_done = set(subjobs.done())
+            saved_pids = set(zfile.namelist())
+            missing_pids = subjobs_done - saved_pids
+
+            if missing_pids:
+                print(mpid)
+
+            for pid in tqdm(missing_pids):
+                # run.jobs()
+                pid_path = Path(mpid) / pid
+
+                cmd = run(['alien_ps', '-jdl', pid])
+                jdl_txt, *_ = cmd.communicate()
+                # for pid, jjdl in jdl_txt:
+                zfile.writestr(str(pid_path / 'jdl'), jdl_txt)
+
+                cmd = run(['alien_ps', '-trace', pid])
+                trace_txt, *_ = cmd.communicate()
+                # for pid, jjdl in trace_txt:
+                zfile.writestr(str(pid_path / 'trace'), trace_txt)
+
+                cmd = run(['alien_kill', pid])
+                cmd.wait()
+
+    return
+    print("Loading processes")
+    cmd = run(['gbbox', 'ps', '-s', '-X'])
+    cmd_out, *_ = cmd.communicate()
+    print(cmd_out)
+    # print('---')
+    # print(os.environ['PATH'])
+    # print('---')
+    # print(os.environ['PATH'])
+
+    ls = sp.Popen(['ls', '-l', '--color=always'], stdout=sp.PIPE)  # capture_output=True)
+    # ls = sp.Popen(['ls', '-l'], stdout=sp.PIPE)  #, capture_output=True)
+    print(ls)
+
+
+    ls_out, _ = ls.communicate()
+    print(ls_out.decode())
+
+
+class JobList:
+
+    REGEX = re.compile(r"""
+                        (?P<user>[a-z]+)
+                        \s+
+                        (?P<splitjob>-)?
+                        (?P<pid>[0-9]+)
+                        \s+
+                        (?P<status>[A-Z]+)
+                        \s+
+                        (?P<runtime>[0-9:]+)?
+                        \s+
+                        (?P<path>\S+)
+                       """, re.X)
+
+    def __init__(self, text):
+
+        self.jobs = [row.groupdict()
+                     for row in self.REGEX.finditer(text)]
+
+    def running(self):
+        return [j['pid']
+                for j in self.jobs
+                if j['status'] in ('RS', 'R')]
+
+    def done(self):
+        return [j['pid']
+                for j in self.jobs
+                if j['status'] in ('D', 'DW')]
+
+    @classmethod
+    def FromCommand(cls, args):
+        cmd = run(args.split())
+        cmd_out, *_ = cmd.communicate()
+        #print(cmd_out)
+        return cls(cmd_out)
+
+
+if __name__ == "__main__":
+    exit(main())
