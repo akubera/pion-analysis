@@ -1,0 +1,404 @@
+#!/usr/bin/env python
+#
+# grid-job
+#
+
+import os
+import sys
+import json
+import logging
+import shutil
+from hashlib import md5
+from pathlib import Path
+from pprint import pprint
+from datetime import datetime
+from contextlib import contextmanager
+
+import yaml
+import sh
+
+
+def arg_parser():
+    from argparse import ArgumentParser, FileType
+    parser = ArgumentParser()
+
+    subparsers = parser.add_subparsers(title='COMMAND')
+
+    new_parser = subparsers.add_parser("new")
+    new_parser.set_defaults(func=new_job)
+    new_parser.add_argument("--disable-cache",
+                            action='store_true',
+                            help='Disable using the cache')
+    new_parser.add_argument("--tag",
+                            nargs='?',
+                            default=None,
+                            help='Unique analysis identifier')
+    new_parser.add_argument("jfile",
+                            type=FileType('r'),
+                            help='Job description file')
+
+    start_parser = subparsers.add_parser("start")
+    start_parser.set_defaults(func=start_job)
+    start_parser.add_argument("--disable-cache",
+                              action='store_true',
+                              help='Unique analysis identifier')
+    start_parser.add_argument("--tag",
+                              nargs='?',
+                              default=None,
+                              help='Unique analysis identifier')
+    start_parser.add_argument("jfile",
+                              type=FileType('r'),
+                              help='Job description file')
+
+    ls_parser = subparsers.add_parser("ls")
+    ls_parser.set_defaults(func=ls_tags)
+
+    fetch_parser = subparsers.add_parser("fetch-results")
+    fetch_parser.set_defaults(func=fetch_results)
+    fetch_parser.add_argument("workdir",
+                              help='Job working directory')
+    fetch_parser.add_argument("subjob",
+                              nargs='?',
+                              help='Job working directory')
+
+    info_parser = subparsers.add_parser("info")
+    info_parser.set_defaults(func=info_job)
+    info_parser.add_argument("workdir",
+                             help='Job working directory')
+
+    status_parser = subparsers.add_parser("status")
+    status_parser.set_defaults(func=status_job)
+    status_parser.add_argument("workdir",
+                               type=Path,
+                               help='job working directory')
+
+    submit_parser = subparsers.add_parser("submit",
+                                          help='submit subjob to grid')
+    submit_parser.set_defaults(func=submit_job)
+    submit_parser.add_argument("workdir",
+                               help='job working directory')
+    submit_parser.add_argument("subjobid",
+                               type=int,
+                               help='Subjob index')
+
+    merge_parser = subparsers.add_parser("merge", help='submit subjob to grid')
+    merge_parser.set_defaults(func=merge_job)
+    merge_parser.add_argument("--final",
+                              action="store_true",
+                              help="Final merging")
+    merge_parser.add_argument("workdir",
+                              # type=FileType('r'),
+                              help='job working directory')
+    merge_parser.add_argument("subjobid",
+                              type=int,
+                              help='Subjob index')
+
+    clear_parser = subparsers.add_parser("clear", help='Removes finished jobs')
+    clear_parser.set_defaults(func=clear_job)
+
+    clear_parser.add_argument("workdir",
+                              # type=FileType('r'),
+                              help='job working directory')
+    clear_parser.add_argument("subjobid",
+                              type=int,
+                              help='job working directory')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+
+    args.func(args)
+
+
+def new_job(args):
+    sys.path.insert(0, '.')
+
+    tag = args.tag or '%X' % int(f'{datetime.utcnow():%y%j%H%M%S}')
+
+    print(f"Creating new job: {tag!r} from file {args.jfile.name!r}")
+
+    from femtoanalysis import JobDescriptionLoader
+
+    job_data = JobDescriptionLoader(tag, args.jfile)
+
+    print("dataset:", job_data.production)
+    print("splitting runlists:")
+
+    from ROOT import TAlienCollection, TAlien, TFile
+
+    alien = TAlien.Connect("alien://")
+    gridhome = alien.GetHomeDirectory()
+    if not gridhome:
+        print("Could not load grid home directory", file=sys.stderr)
+        return 1
+
+    gridhomepath = Path(gridhome)
+    print("Begin copy necessary xml files")
+    grid_xml_path = gridhomepath / 'xml'
+
+    sublists = job_data.iter_splitsublists()
+
+    job_data.grid_urls = []
+
+    for i, subruns in enumerate(sublists):
+        sublist = list(sorted(subruns))
+        print(" %2d" % i, sublist)
+        listhash = md5(b'%r' % sublist).hexdigest()
+
+        runlist_filename = Path(listhash).with_suffix(".xml")
+        runlist_localpath = Path("xmls") / runlist_filename
+
+        runlist_gridpath = grid_xml_path / runlist_filename
+
+        runlist_gridurl = 'alien:/%s' % runlist_gridpath
+        job_data.grid_urls.append(runlist_gridpath)
+
+        # assume uploading was successfull
+        if runlist_localpath.exists():
+            continue
+
+        filenames = job_data.production.xmlfilenames_for_runs(subruns, 'xmls')
+        collection = TAlienCollection(str(filenames[0]), 100000)
+        for filename in filenames[1:]:
+            c = TAlienCollection.Open(str(filename))
+            collection.AddFast(c)
+        collection_name = 'collection-' + listhash
+
+        local_url = "file://%s" % runlist_localpath
+        comment = 'runlist:%r' % sublist
+        collection.ExportXML(local_url, False, False, collection_name, comment)
+
+        # TFile.Cp(str(outpath), str(dest))
+        sh.alien_cp(str(runlist_localpath), str(runlist_gridurl))
+
+    settings = {
+        "tag": tag,
+        "date-created": datetime.now().isoformat(sep=' '),
+        "production": dict(job_data.production),
+        "runlists": job_data.dataset['runlists'],
+        "subsets": [{"xml_filename": str(s)} for s in job_data.grid_urls],
+    }
+
+    workdir = Path('work') / tag
+    print("Creating pending tasks in %s" % workdir)
+    workdir.mkdir()
+
+    with (workdir / "settings.json").open('w') as f:
+        json.dump(settings, f, indent=1)
+
+    from femtoanalysis import copy_job_templates
+    copy_job_templates(job_data, workdir)
+
+    with (workdir / "job-configuration.json").open('w') as f:
+        json.dump(job_data.job_data, f, indent=1)
+
+    print("Finished creating task %s" % workdir)
+    return 0
+
+
+def ls_tags(args):
+    for f in Path("work").glob('*'):
+        print(str(f))
+
+
+def submit_job(args):
+    work_dir = Path(args.workdir).absolute()
+    subjob = args.subjobid
+    if not work_dir.is_dir():
+        print("Error: work directory is not a directory",
+              file=sys.stderr)
+        return 1
+
+    os.chdir(work_dir)
+
+    with lockdir(work_dir / 'lock') as lock:
+
+        settings_path = Path("settings.json")
+        settings = yaml.safe_load(settings_path.open())
+        tag = settings['tag']
+
+        logging.basicConfig(format='== %(message)s')  # format='[%(asctime)-15s]')
+
+        log = logging.getLogger()
+        log.setLevel(logging.INFO)
+        logfile = logging.FileHandler('log')
+        log.addHandler(logfile)
+        fmt = logging.Formatter(f'[%(asctime)-15s] {tag}: %(message)s')
+        logfile.setFormatter(fmt)
+        log.info(f"Starting sub-job {subjob}")
+
+        subjob_name = '%02d' % subjob
+        os.mkdir(subjob_name)
+        os.chdir(subjob_name)
+        os.link('../ConfigFemtoAnalysis.C', 'ConfigFemtoAnalysis.C')
+
+        try:
+            cmd = sh.aliroot("-q", "-x", "-l", "-b", "../SubmitGridJob.C", subjob)
+        except sh.ErrorReturnCode_1 as e:
+            print("Error! See latest-error.log for details")
+            with open("latest-error.log", 'wb') as f:
+                f.write(b'---- stderr ----\n')
+                f.write(e.stderr)
+                f.write(b'---- stdout ----\n')
+                f.write(e.stdout)
+                f.write(b'---- end ----\n')
+            return 1
+
+        output = cmd.stdout.decode()
+        with open(f"log-submit-{subjob}.txt", 'w') as f:
+            f.write(output)
+
+        if cmd.stderr:
+            with open(f"log-submit-{subjob}-err.txt", 'wb') as f:
+                f.write(cmd.stderr)
+
+        import re
+        m = re.search(r'THE JOB ID IS: ([\d]+)', output, re.I)
+        if m:
+            print("Found masterjob : ", m.group(1))
+        else:
+            print("Could not find masterjob")
+
+        return
+
+
+def status_job(args):
+    pass
+
+
+def merge_job(args):
+    workdir = Path(args.workdir)
+    os.chdir(workdir)
+    import sh
+
+    lockdir = Path('lock').absolute()
+    try:
+        os.mkdir(lockdir)
+    except FileExistsError:
+        print(f"Directory {workdir} appears to be locked.")
+        return 1
+
+    print("Submitting Merge Job")
+
+    merge_log_path = Path("merge.log")
+
+    subjob_name = '%02d' % args.subjobid
+    os.chdir(subjob_name)
+
+    try:
+        with merge_log_path.open('a') as mlog:
+            def _process_subjob(line):
+                if 'Job' in line:
+                    print(line)
+                if isinstance(line, bytes):
+                    line = line.decode()
+                mlog.write(line)
+
+            mlog.write("---- begin merge ----\n")
+            sh.aliroot('-q', '-b', '-l', "../MergeGridJob.C", args.subjobid, _out=_process_subjob)
+            mlog.write("---- end merge ----\n")
+    finally:
+        os.rmdir(lockdir)
+
+    return 0
+
+
+def info_job(args):
+    workdir = Path(args.workdir)
+    settings_path = workdir / 'settings.json'
+    pprint(json.load(settings_path.open()))
+
+
+def start_job(args):
+    pass
+
+
+def clear_job(args):
+    workdir = Path(args.workdir)
+    settings_path = workdir / 'settings.json'
+
+    # pprint(json.load(settings_path.open()))
+    print(workdir.name)
+
+    # subjobid
+
+
+def fetch_results(args):
+    subjob = args.subjob
+    workdir = args.workdir
+    if args.subjob is None:
+        try:
+            workdir, subjob = workdir.split('-')
+        except ValueError:
+            print("Could not work")
+            return
+
+    workdir = Path(workdir)
+    if not workdir.exists():
+        if workdir.parts[0] != "work":
+            workdir = 'work' / workdir
+
+            if not workdir.exists():
+                print("Could find workdir", args.workdir, file=sys.stderr)
+                return 1
+
+    subjob = int(subjob)
+    tag = str(workdir[-1])
+    print(tag)
+    return 0
+
+    local = ''
+    print()
+    dirname = "{}/{}j"
+    workdir = Path(f"{workdir}-{subjob:02d}")
+    print(f"Fetching results from {workdir} - {subjob}")
+    settings_path = workdir / 'settings.json'
+
+    # p = Path('/'.join(workdir.parts[1:]))
+    print('>>', path)
+
+    print(settings_path)
+
+    from ROOT import TGrid
+
+    alien = TGrid.Connect("alien:/")
+    home = alien.GetHomeDirectory()
+    wrkdir = home / 'wrk' / workdir.relative_to("work")
+
+    # a = f"{wrkdir}-{}"
+    # print(a, 'ax')
+
+    return 0
+
+
+@contextmanager
+def lockdir(path: Path, wait=False):
+    from time import sleep
+
+    path = path.absolute()
+
+    has_printed_warning = False
+    while True:
+        try:
+            path.mkdir()
+        except FileExistsError:
+            if not wait:
+                raise
+            if not has_printed_warning:
+                print("Waiting for directory lock.")
+                has_printed_warning = True
+        else:
+            break
+
+    try:
+        (path / 'pid').write_text(f'{os.getpid()}')
+        yield path
+    finally:
+        shutil.rmtree(path)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
