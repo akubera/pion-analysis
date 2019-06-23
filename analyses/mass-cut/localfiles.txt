@@ -1,0 +1,5 @@
+/alice/sim/2016/LHC16g1/246928/AOD/001/AliAOD.root
+/alice/sim/2016/LHC16g1/246928/AOD/002/AliAOD.root
+/alice/sim/2016/LHC16g1/246928/AOD/003/AliAOD.root
+/alice/sim/2016/LHC16g1/246928/AOD/004/AliAOD.root
+/alice/sim/2016/LHC16g1/246928/AOD/005/AliAOD.root
