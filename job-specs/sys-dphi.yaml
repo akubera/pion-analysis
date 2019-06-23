@@ -1,0 +1,109 @@
+---
+dataset: LHC15o_pass1
+
+aliphysics-version: vAN-20190602_ROOT6-1
+
+libraries:
+  - libPWGCFfemtoscopy
+  - libPWGCFfemtoscopyUser
+
+run-chunk-size: 13
+optimize-subruns: true
+
+ttl: 50000
+
+kt-bins: &KT_BINS
+  bins:
+  - [0.20, 0.30]
+  - [0.30, 0.40]
+  - [0.40, 0.50]
+  - [0.50, 0.60]
+  - [0.60, 0.70]
+  - [0.70, 0.80]
+  - [0.80, 1.00]
+
+handlers:
+  - macro: "$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C"
+
+tasks:
+  - macro: "$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C"
+  - macro: "$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C"
+  - analysis: PionAnalysis
+    name: PWG2FEMTO/pionfemto-dphi
+    event_reader:
+      _class: AliFemtoEventReaderAlt
+      filter-bit: 7
+
+    events-to-mix: 3
+    is-simulation: false
+
+    cuts:
+      event:
+        _class: AliFemtoEventCutPionPionAK
+        zdc-participants-min: 0
+        min-zdc-participants: 0
+        zvert_range: [-8.0, 8.0]
+        matrix:
+          cent_range:
+            - [0,  10]
+            #- [10, 20]
+            #- [20, 30]
+            #- [30, 40]
+            #- [40, 50]
+
+      track:
+        _class: AliFemtoTrackCutPionPionAK
+        eta: [-0.8, 0.8]
+        pt_range: [0.2, 2.0]
+        status: 0
+        rchi2-tpc-min: 0.33
+        rchi2-tpc-max: 1.8
+        rchi2-its-max: 3.8
+        nsigma_pion: 3.0
+        max_xy: 0.07
+        max_z: 0.07
+
+      pair:
+        _class: AliFemtoPairCutPionPionAKDetaDphi
+        share_fraction_max: 0.06
+        delta_eta_min: 0.014
+        matrix:
+          delta_phistar_min:
+            - 0.015
+            - 0.02
+            - 0.03
+            - 0.04
+            - 0.05
+
+
+    corr-fctns:
+
+      - class: AliFemtoCorrFctnDEtaDPhiStar
+        args: ['DetaDphi']
+
+      - class: AliFemtoAvgSepCorrFctn
+        args: ['AvgSep', 72, 0.0, 35.0]
+
+      - class: AliFemtoShareQualityCorrFctn
+        args: ['ShareFrac', 72, 0.0, 1.0]
+
+      - class: AliFemtoCorrFctnQLCMS
+        args: ['', 'QLCSM', 72, 0.0, 1.0]
+
+      - class: AliFemtoCorrFctnQLCMS
+        args: ['', '', 300, 0.0, 1.5]
+        kt:
+          <<: *KT_BINS
+          name: KT_QLCMS
+
+      - class: AliFemtoQinvCorrFctn
+        args: ['', 400, 0.0, 2.0]
+        kt:
+          <<: *KT_BINS
+          name: KT_QINV
+
+      - class: AliFemtoCorrFctn3DLCMSPosQuad
+        args: ['', 45, 0.1425]
+        kt:
+          <<: *KT_BINS
+          name: KT_PQ3D
