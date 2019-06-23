@@ -40,13 +40,11 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
 {
   AliFemtoAnalysisPionPion *analysis = new AliFemtoAnalysisPionPion(name, a, c);
 
-  auto *hyc_cf = new AliFemtoModelCorrFctnTrueQ6D("",
-                  22, 0.0, 0.1125,
-                  45, -0.1125, 0.1125,
-                  57, -0.1125, 0.1125);
-                  // 26, 0.0, 0.1325,
-                  // 57, -0.1325, 0.1325,
-                  // 57, -0.1325, 0.1325);
+  auto *hyc_cf = new AliFemtoModelCorrFctnTrueQ6D::Builder()
+                  .QoutRange(0.0, 0.1325)
+                  .QsideRange(-0.1325, 0.1325)
+                  .QlongRange(-0.1325, 0.1325)
+                  .IntoCF();
 
   m.AddAnalysis(analysis);
 }
