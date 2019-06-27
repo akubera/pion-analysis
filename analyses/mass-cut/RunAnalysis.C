@@ -5,6 +5,11 @@
 #include <TStopwatch.h>
 #include <AliAnalysisManager.h>
 
+#include <set>
+#include <string>
+#include <fstream>
+#include <iostream>
+
 
 std::set<TString>
 load_files(std::string filename)
@@ -69,7 +74,7 @@ RunAnalysis(TString wd="")
 
   TDatime td;
   auto *mgr = new AliAnalysisManager();
-
+  //if j
   mgr->SetCommonFileName(Form("QinvResult-%-d%d.root", td.GetDate(), td.GetTime()));
   gROOT->Macro("$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C");
 
@@ -88,7 +93,7 @@ RunAnalysis(TString wd="")
   gSystem->CopyFile("ConfigFemtoAnalysis.C", wd + "/ConfigFemtoAnalysis.C");
   gSystem->cd(wd);
 
-#if true
+#if false
   //std::string file = "files-246001.txt";
   //std::string ffile = "files-AOD194.txt";
   std::string ffile = "../localfiles.txt";
@@ -105,7 +110,7 @@ RunAnalysis(TString wd="")
   mgr->InitAnalysis();
   mgr->PrintStatus();
 
-  mgr->StartAnalysis("local", input, 350);
+  mgr->StartAnalysis("local", input);
 #else
   //wd = "AnalysisResult-12";
   setup_grid(mgr, wd);
