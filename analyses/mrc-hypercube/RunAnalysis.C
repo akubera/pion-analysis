@@ -34,10 +34,10 @@ void setup_grid(AliAnalysisManager *mgr, TString workdir)
 {
   auto *alien = new AliAnalysisAlien();
   alien->SetRunMode("full");
-  // alien->SetRunMode("terminate");
+  alien->SetRunMode("terminate");
   alien->SetGridOutputDir("output");
   alien->SetGridWorkingDir(workdir);
-  alien->SetAliPhysicsVersion("vAN-20190623_ROOT6-1");
+  alien->SetAliPhysicsVersion("vAN-20190626_ROOT6-1");
   alien->SetDropToShell(false);
   alien->SetCheckCopy(false);
   alien->SetMaxMergeFiles(7);
@@ -51,10 +51,10 @@ void setup_grid(AliAnalysisManager *mgr, TString workdir)
   alien->SetGridDataDir("/alice/sim/2016/LHC16i3a");
   alien->SetDataPattern("/AOD/*/AliAOD.root");
 
-  std::vector<int> runs = {
-  246675, 246676, 246805, 246804, 246807, 246424, 246808,
+  std::set<int> runs = {
+  // 246675, 246676, 246805, 246804, 246807, 246424, 246808,
   // 246809, 246428, 246431, 246945, 246434,
-  // 246948, 246844, 246845, 246846, 246847, 246851, 246980, 246982, 246984, 246989, 246991, 246865,
+  246948, 246844, 246845, 246846, 246847, 246851, 246980, 246982, 246984, 246989, 246991, 246865,
   // 246994, 246867, 246487, 246871, 246488, 246493, 246750, 246751, 246495, 246757, 246758, 246759,
   // 246760, 246763, 246765
   };
@@ -63,6 +63,7 @@ void setup_grid(AliAnalysisManager *mgr, TString workdir)
     alien->AddRunNumber(run);
   }
   // alien->AddDataFile("/alice/cern.ch/user/a/akubera/xml/ae190dbdb6da2271f8dd14c1e5b8536d.xml");
+  // alien->AddDataFile("/alice/cern.ch/user/a/akubera/job-20190623181107/246675_246808.xml");
 
   mgr->SetGridHandler(alien);
 }
@@ -103,23 +104,22 @@ RunAnalysis(TString wd="")
   femtotask->SetupContainers();
 
 #if false
- setup_grid(mgr, wd);
+  setup_grid(mgr, wd);
 
   mgr->InitAnalysis();
   mgr->PrintStatus();
 
   mgr->StartAnalysis("grid");
 #else
-
   mgr->InitAnalysis();
   mgr->PrintStatus();
 
   TChain *input = new TChain("aodTree");
-  for (int run_num : {1, 2}) {
-    input->Add(Form("/alice/sim/2016/LHC16g1/246928/AOD/%03d/AliAOD.root", run_num));
+  for (int run_num : {1, 2, 3, 4}) {
+    input->Add(Form("/alice/sim/2016/LHC16g1/246928/AOD198/%04d/AliAOD.root", run_num));
   }
 
-  mgr->StartAnalysis("local", input, 100);
+  mgr->StartAnalysis("local", input);
 #endif
 
   timer.Stop();
