@@ -30,6 +30,10 @@ struct PrimaryPionCut : public AliFemtoTrackCutPionPionIdealAK {
     : AliFemtoTrackCutPionPionIdealAK(cfg)
     {}
 
+  PrimaryPionCut(const AliFemtoTrackCutPionPionIdealAK &cut)
+    : AliFemtoTrackCutPionPionIdealAK(cut)
+    {}
+
   virtual ~PrimaryPionCut() {}
 
   virtual bool Pass(const AliFemtoTrack *track)
@@ -44,6 +48,39 @@ struct PrimaryPionCut : public AliFemtoTrackCutPionPionIdealAK {
 
   virtual const char* ClassName() const
     { return "PrimaryPionCut"; }
+};
+
+struct PseudoEsdTrackCut : public AliFemtoTrackCutPionPionIdealAK, public AliFemtoESDTrackCut {
+
+  PseudoEsdTrackCut()
+    : AliFemtoTrackCutPionPionIdealAK()
+    , AliFemtoESDTrackCut()
+    {}
+
+  PseudoEsdTrackCut(AliFemtoConfigObject &cfg)
+    : AliFemtoTrackCutPionPionIdealAK(cfg)
+    , AliFemtoESDTrackCut()
+    {}
+
+  PseudoEsdTrackCut(const AliFemtoESDTrackCut &cut)
+    : AliFemtoTrackCutPionPionIdealAK()
+    , AliFemtoESDTrackCut(cut)
+    {}
+
+  virtual ~PseudoEsdTrackCut() {}
+
+  virtual bool Pass(const AliFemtoTrack *track)
+    {
+      const AliFemtoModelHiddenInfo *info = static_cast<AliFemtoModelHiddenInfo*>(track->GetHiddenInfo());
+      const Int_t origin = info->GetOrigin();
+      if (origin != 0) { // } || std::fabs(info->GetMass() - 0.139) > .001) {
+        return false;
+      }
+      return AliFemtoESDTrackCut::Pass(track);
+    }
+
+  virtual const char* ClassName() const
+    { return "PseudoEsdTrackCut"; }
 };
 
 // static const ULong_t filter_mask = BIT(5) | BIT(6);
@@ -76,9 +113,30 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
   AliFemtoAnalysisPionPion *analysis = new AliFemtoAnalysisPionPion(name, a, c);
   analysis->SetTrackFilter(filter_mask);
 
-  // auto *track_cut = new PrimaryPionCut();
-  // analysis->SetFirstParticleCut(track_cut);
-  // analysis->SetSecondParticleCut(track_cut);
+
+  // Use ESD Track cut
+  // c.cuts_use_attrs = false;
+  // auto *track_cut = analysis->BuildPionCut1(c);
+
+  c.cuts_use_attrs = false;
+  auto *track_cut = static_cast<AliFemtoESDTrackCut *>(analysis->BuildPionCut1(c));
+  track_cut->SetMostProbable(0);
+
+  // Use Copy of ESD Track cut
+  // c.cuts_use_attrs = false;
+  // AliFemtoESDTrackCut *track_cut = new AliFemtoESDTrackCut(static_cast<const AliFemtoESDTrackCut&>(*analysis->BuildPionCut1(c)));
+
+  // Use Pseudo-Esd Track Cut
+  // c.cuts_use_attrs = false;
+  // AliFemtoESDTrackCut *track_cut = new PseudoEsdTrackCut(static_cast<const AliFemtoESDTrackCut&>(*analysis->BuildPionCut1(c)));
+
+  // Use PrimaryPionCut
+  // auto *track_cut = new PrimaryPionCut(*static_cast<AliFemtoTrackCutPionPionIdealAK*>(analysis->FirstParticleCut()));
+  // track_cut->status = 16;
+
+
+  analysis->SetFirstParticleCut(track_cut);
+  analysis->SetSecondParticleCut(track_cut);
   // track_cut->ncls_its_min = 4;
   // track_cut->pt_range = {0.14, 2.0};
   // track_cut->eta_range = {-0.4, 0.4};
@@ -134,6 +192,7 @@ ConfigFemtoAnalysis()
   ccfg.cuts_use_attrs = true;
   ccfg.mc_pion_only = true;
   ccfg.pion_1_rm_neg_lbl = false;
+  ccfg.pion_1_status = 16;
   ccfg.event_CentralityMin = 0.0;
   ccfg.event_CentralityMax = 90.0;
 

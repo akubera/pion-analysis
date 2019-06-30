@@ -116,7 +116,7 @@ RunAnalysis(TString wd="")
 
   TChain *input = new TChain("aodTree");
   // for (int run_num : {1, 2, 3, 4, 5, 6}) {
-  for (int run_num = 1; run_num <= 6; run_num++){
+  for (int run_num = 7; run_num <= 7+5; run_num++){
     input->Add(Form("/alice/sim/2016/LHC16g1a/246980/AOD/%03d/AliAOD.root", run_num));
   }
 
