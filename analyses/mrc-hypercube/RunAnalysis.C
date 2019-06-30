@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iostream>
 
+
 std::set<TString>
 load_files(std::string filename)
 {
@@ -30,14 +31,16 @@ load_files(std::string filename)
   return result;
 }
 
-void setup_grid(AliAnalysisManager *mgr, TString workdir)
+
+void
+setup_grid(AliAnalysisManager *mgr, TString workdir)
 {
   auto *alien = new AliAnalysisAlien();
   alien->SetRunMode("full");
-  alien->SetRunMode("terminate");
+  //alien->SetRunMode("terminate");
   alien->SetGridOutputDir("output");
   alien->SetGridWorkingDir(workdir);
-  alien->SetAliPhysicsVersion("vAN-20190626_ROOT6-1");
+  alien->SetAliPhysicsVersion("vAN-20190630_ROOT6-1");
   alien->SetDropToShell(false);
   alien->SetCheckCopy(false);
   alien->SetMaxMergeFiles(7);
@@ -67,6 +70,7 @@ void setup_grid(AliAnalysisManager *mgr, TString workdir)
 
   mgr->SetGridHandler(alien);
 }
+
 
 void
 RunAnalysis(TString wd="")
