@@ -89,22 +89,22 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
 {
   AliFemtoAnalysisPionPion *analysis = new AliFemtoAnalysisPionPion(name, a, c);
   analysis->SetTrackFilter(filter_mask);
-  analysis->AddStanardCutMonitors();
 
   //auto *track_cut = new PrimaryPionCut();
-  auto *track_cut = new AliFemtoTrackCutPionPionIdealAK();
-  analysis->SetFirstParticleCut(track_cut);
-  analysis->SetSecondParticleCut(track_cut);
+  // auto *track_cut = new AliFemtoTrackCutPionPionIdealAK();
+  // track_cut->ncls_its_min = 4;
+  // track_cut->rchi2_its_max = 1.6;
+  // track_cut->rchi2_tpc_max = 1.6;
+  // track_cut->rchi2_tpc_min = 0.33;
+  // track_cut->pt_range = {0.14, 2.0};
+  // track_cut->eta_range = {-0.8, 0.8};
+  // track_cut->nsigma_pion = 3.0;
+  // track_cut->max_xy = 0.04;
+  // track_cut->max_z = 0.05 ;
+  // track_cut->charge = (a.pion_type_1 == AFAPP::kPiPlus) ? 1 : -1;
+  // analysis->SetFirstParticleCut(track_cut);
+  // analysis->SetSecondParticleCut(track_cut);
 
-  track_cut->ncls_its_min = 4;
-  track_cut->rchi2_its_max = 1.6;
-  track_cut->rchi2_tpc_max = 1.6;
-  track_cut->rchi2_tpc_min = 0.33;
-  track_cut->pt_range = {0.14, 2.0};
-  track_cut->eta_range = {-0.8, 0.8};
-  track_cut->nsigma_pion = 3.0;
-  //track_cut->max_xy = 0.05;
-  //track_cut->max_z = 0.05;
 
   auto *ff = new AliFemtoModelManager();
   auto *wg = new AliFemtoModelWeightGeneratorBasic();
@@ -125,11 +125,12 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
                   30, 0.0, 0.1525,
                   61, -0.1525, 0.1525,
                   61, -0.1525, 0.1525);
+
   auto *ktmrc = new AliFemtoKtBinnedCorrFunc("KT_HYPERCUBE", mrc_cf);
-#if true
-  const std::vector<std::pair<float, float>> ktbins = {{0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}, {1.0, 1.2}};
+#if false
+  const std::vector<std::pair<float, float>> ktbins = {{0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}};
 #else
-  const std::vector<std::pair<float, float>> ktbins = {{0.3, 0.4}, {0.5, 0.6}, {0.7, 0.8}, {0.8, 1.0}};
+  const std::vector<std::pair<float, float>> ktbins = {{0.3, 0.4}, {0.5, 0.6}, {0.7, 0.8}, {0.8, 1.0}, {1.0, 1.2}};
 #endif
 
   ktmrc1d->AddKtRanges(ktbins);
@@ -137,6 +138,9 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
 
   analysis->AddCorrFctn(ktmrc1d);
   analysis->AddCorrFctn(ktmrc);
+
+  analysis->AddStanardCutMonitors();
+
   m.AddAnalysis(analysis);
 }
 
@@ -154,6 +158,12 @@ ConfigFemtoAnalysis()
   ccfg.mc_pion_only = true;
   ccfg.pion_1_rm_neg_lbl = true;
   ccfg.pion_1_status = 16;
+  ccfg.pion_1_max_impact_xy = 0.04;
+  ccfg.pion_1_max_impact_z = 0.05;
+  ccfg.pion_1_sigma = 3.0;
+  ccfg.pion_1_max_its_chi_ndof = 1.6;
+  ccfg.pion_1_max_tpc_chi_ndof = 1.6;
+  ccfg.pion_1_min_tpc_chi_ndof = 0.33;
   ccfg.event_CentralityMin = 0.0;
   ccfg.event_CentralityMax = 90.0;
 

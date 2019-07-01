@@ -37,7 +37,7 @@ setup_grid(AliAnalysisManager *mgr, TString workdir)
 {
   auto *alien = new AliAnalysisAlien();
   alien->SetRunMode("full");
-  //alien->SetRunMode("terminate");
+  alien->SetRunMode("terminate");
   alien->SetGridOutputDir("output");
   alien->SetGridWorkingDir(workdir);
   alien->SetAliPhysicsVersion("vAN-20190630_ROOT6-1");
@@ -58,15 +58,16 @@ setup_grid(AliAnalysisManager *mgr, TString workdir)
   // 246675, 246676, 246805, 246804, 246807, 246424, 246808,
   // 246809, 246428, 246431, 246945, 246434,
   246948, 246844, 246845, 246846, 246847, 246851, 246980, 246982, 246984, 246989, 246991, 246865,
-  // 246994, 246867, 246487, 246871, 246488, 246493, 246750, 246751, 246495, 246757, 246758, 246759,
+  246994, 246867, 246487, 246871, 246488, 246493, 246750, 246751, 246495, 246757, 246758, 246759,
   // 246760, 246763, 246765
   };
 
-  for (auto run : runs) {
-    alien->AddRunNumber(run);
-  }
+  // for (auto run : runs) {
+  //   alien->AddRunNumber(run);
+  // }
   // alien->AddDataFile("/alice/cern.ch/user/a/akubera/xml/ae190dbdb6da2271f8dd14c1e5b8536d.xml");
   // alien->AddDataFile("/alice/cern.ch/user/a/akubera/job-20190623181107/246675_246808.xml");
+  alien->AddDataFile("/alice/cern.ch/user/a/akubera/job-20190630183405/246844_246991.xml");
 
   mgr->SetGridHandler(alien);
 }
@@ -107,7 +108,7 @@ RunAnalysis(TString wd="")
   mgr->AddTask(femtotask);
   femtotask->SetupContainers();
 
-#if false
+#if true
   setup_grid(mgr, wd);
 
   mgr->InitAnalysis();
