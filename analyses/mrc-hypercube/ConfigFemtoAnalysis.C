@@ -90,21 +90,14 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
   AliFemtoAnalysisPionPion *analysis = new AliFemtoAnalysisPionPion(name, a, c);
   analysis->SetTrackFilter(filter_mask);
 
+  c.cuts_use_attrs = false;
+  auto *track_cut = static_cast<AliFemtoESDTrackCut*>(analysis->BuildPionCut1(c));
+  c.cuts_use_attrs = true;
+
   //auto *track_cut = new PrimaryPionCut();
   // auto *track_cut = new AliFemtoTrackCutPionPionIdealAK();
-  // track_cut->ncls_its_min = 4;
-  // track_cut->rchi2_its_max = 1.6;
-  // track_cut->rchi2_tpc_max = 1.6;
-  // track_cut->rchi2_tpc_min = 0.33;
-  // track_cut->pt_range = {0.14, 2.0};
-  // track_cut->eta_range = {-0.8, 0.8};
-  // track_cut->nsigma_pion = 3.0;
-  // track_cut->max_xy = 0.04;
-  // track_cut->max_z = 0.05 ;
-  // track_cut->charge = (a.pion_type_1 == AFAPP::kPiPlus) ? 1 : -1;
-  // analysis->SetFirstParticleCut(track_cut);
-  // analysis->SetSecondParticleCut(track_cut);
-
+  analysis->SetFirstParticleCut(track_cut);
+  analysis->SetSecondParticleCut(track_cut);
 
   auto *ff = new AliFemtoModelManager();
   auto *wg = new AliFemtoModelWeightGeneratorBasic();
@@ -114,7 +107,6 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
   mrc_cf_1d->ConnectToManager(ff);
 
   auto *ktmrc1d = new AliFemtoKtBinnedCorrFunc("KT_MRC1D", mrc_cf_1d);
-
 
   // analysis->AddCorrFctn(mrc_cf_1d);
 
@@ -127,7 +119,7 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
                   61, -0.1525, 0.1525);
 
   auto *ktmrc = new AliFemtoKtBinnedCorrFunc("KT_HYPERCUBE", mrc_cf);
-#if false
+#if true
   const std::vector<std::pair<float, float>> ktbins = {{0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}};
 #else
   const std::vector<std::pair<float, float>> ktbins = {{0.3, 0.4}, {0.5, 0.6}, {0.7, 0.8}, {0.8, 1.0}, {1.0, 1.2}};
