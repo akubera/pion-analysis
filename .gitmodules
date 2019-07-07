@@ -1,0 +1,3 @@
+[submodule "alimaster"]
+	path = alimaster
+	url = ssh://git@gitlab.cern.ch:7999/akubera/AliMaster.git
