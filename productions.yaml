@@ -1,0 +1,101 @@
+#
+# ALICE productions
+#
+# Used to search for analysis files.
+# Each production has its own 'rules' for how data is stored.
+#
+# Files are found by searching:
+#   %(data_dir) / %(prefix) %(run-number) / %(pattern) / %(filename)
+#
+# * data_dir is the full path to the list of run-directories.
+# * prefix is either '000' or '', and should be set by using the *real-data or *mc-data aliases
+# * pattern should match the 'sub-runs' of the run
+# * $(filename) is the file you are actually looking for
+#   * Use the default data file of the production using rootfile (e.g. AliAOD.root)
+#   * Use the default archive file of the production using archive (e.g. root_archive.zip)
+#
+# Assumptions:
+#   data run numbers lead with '000', MC run numbers do not
+#   data files are AliAOD.root
+#   archive files are root_archive.zip
+#
+# Productions starting with '.' are ignored
+#
+#
+
+.: &aod-data
+  rootfile: "AliAOD.root"
+  archive: "root_archive.root"
+
+.: &real-data
+  <<: *aod-data
+  prefix: "000"
+  is_mc: false
+
+.: &mc-data
+  <<: *aod-data
+  prefix: ""
+  is_mc: true
+
+
+LHC15o_pass1:
+  <<: *real-data
+  data_dir: "/alice/data/2015/LHC15o"
+  pattern: "pass1/AOD/*"
+
+
+LHC15o_pass1_filter194:
+  <<: *real-data
+  data_dir: "/alice/data/2015/LHC15o"
+  pattern: "pass1/AOD194/*"
+
+
+LHC15o_pass1_pidfix:
+  <<: *real-data
+  data_dir: "/alice/data/2015/LHC15o"
+  pattern: "pass1_pidfix/AOD194/*"
+
+
+LHC15o_pass5_lowIR:
+  <<: *real-data
+  data_dir: "/alice/data/2015/LHC15o"
+  pattern: "pass5_lowIR/AOD194/*"
+
+
+LHC15o_pass5_highIR:
+  <<: *real-data
+  data_dir: "/alice/data/2015/LHC15o"
+  pattern: "pass5_low/AOD194/*"
+
+
+LHC16i1a:
+  <<: *mc-data
+  data_dir: "/alice/sim/2016/LHC16i1a"
+  pattern: "AOD198/*"
+
+
+LHC10h_AOD160:
+  <<: *real-data
+  data_dir: "/alice/data/2010/LHC10h"
+  pattern: "ESDs/pass2/AOD160/*"
+
+LHC10h_AOD160:
+  <<: *real-data
+  data_dir: "/alice/data/2010/LHC10h"
+  pattern: "ESDs/pass2/AOD160/*"
+
+
+LHC11h:
+  <<: *real-data
+  data_dir: " /alice/data/2011/LHC11h_2"
+  pattern: "ESDs/pass2/AOD/*"
+
+LHC11h_AOD115:
+  <<: *real-data
+  data_dir: " /alice/data/2011/LHC11h_2"
+  pattern: "ESDs/pass2/AOD115/*"
+
+LHC11h_AOD145:
+  <<: *real-data
+  data_dir: " /alice/data/2011/LHC11h_2"
+  pattern: "ESDs/pass2/AOD145/*"
