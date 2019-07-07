@@ -21,26 +21,66 @@ def main(argv=None):
         argv = sys.argv[1:]
     args = arg_parser().parse_args(argv)
 
+    from ROOT import TGrid, TAlienCollection
+
+    grid = TGrid.Connect("alien://")
+
+    # data_path = '/alice/sim/2016/LHC16i3a/246217'
+
+    production = 'LHC18e1'
+
+    production_path = '/alice/sim/2018/LHC18e1'
+    file_pattern = '/AOD198/*/AliAOD.root'
+
+    runs = {245954, 245700, 245829, 246087, 245831, 245705, 246089, 246217, 245833, 245963, 246222, 246225}
+
+    queries = [grid.Query(production_path + f'/{run}', file_pattern) for run in runs]
+    collections = [TAlienCollection.OpenQuery(q) for q in queries]
+
+    collection = collections.pop()
+    collection.Status()
+
+    # q = grid.Query(data_path, file_pattern)
+    # collection = TAlienCollection.OpenQuery(w)
+    # collections = []
+
+    # merge collection
+    for c in collections:
+        collection.AddFast(c)
+
+    collection.Status()
+
+    data_id = ':'.join((production_path, file_pattern, ','.join(map(str, sorted(runs)))))
+    from hashlib import md5
+    md5hash = md5()
+    md5hash.update(data_id.encode())
+    data_hash = md5hash.hexdigest()
+
+    collection_name = f'{production}:{runs}'
+
+    # upload collection to grid
+    dest = f"alien:///alice/cern.ch/user/a/akubera/xml/{data_hash}.xml"
+    collection.ExportXML(dest, False, False, collection_name, "Created By AliMaster")
+
+    return 0
+
     try:
         alien_find = sp.check_output('which alien_find', shell=True, encoding='utf-8').strip()
     except sp.CalledProcessError:
         print("Erro: Not in alien environment", file=sys.stderr)
         return 1
 
+    # with TemporaryDirectory() as tmpdir:
+        # os.chdir(tmpdir)
 
-    with TemporaryDirectory() as tmpdir:
-        os.chdir(tmpdir)
+    collection_name = 'foobar'
 
-        collection_name = 'foobar'
 
-        data_path = '/alice/sim/2016/LHC16i3a/246217'
-        file_pattern = '/AOD/00*/AliAOD.root'
+    # tempfile.NamedTemporaryFile('w')
+    file_data = sp.check_output([alien_find, '-x', collection_name, data_path, file_pattern], stderr=sp.DEVNULL)
+    xml = ElementTree.fromstring(file_data)
 
-        # tempfile.NamedTemporaryFile('w')
-        file_data = sp.check_output([alien_find, '-x', collection_name, data_path, file_pattern], stderr=sp.DEVNULL)
-        xml = ElementTree.fromstring(file_data)
-
-        print(ElementTree.tostring(xml).decode())
+    print(ElementTree.tostring(xml).decode())
 
     # if sp.run("which alien_find", shell=True).returncode != 0:
     #     print("Erro: Not in alien environment", file=sys.stderr)
@@ -48,6 +88,10 @@ def main(argv=None):
 
     # sp.run('')
     # print("ok")
+
+
+    collection = TAlienCollection.Open("tmp.xml")
+    collection.ExportXML(dest, False, False, collection_name, "Created By AliMaster")
 
 
 
