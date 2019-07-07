@@ -1,0 +1,253 @@
+#!/usr/bin/env python3
+#
+# clear-merged-files
+#
+
+import re
+import sys
+from pathlib import Path
+from functools import partial
+from toolz import partition_all
+from xml.etree import ElementTree
+from io import StringIO
+from os import environ
+
+import sh
+from tqdm import tqdm
+
+from alimaster.exe.jdl import ParsedJdl
+
+
+def arg_parser():
+    from argparse import ArgumentParser
+    p = ArgumentParser()
+    p.add_argument("grid_xml_file")
+    p.add_argument("--stage", type=int, default=1)
+    return p
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+
+    from ROOT import TFile, TAlien, TAlienFile
+
+    alien = TAlien.Connect("alien://")
+    if not alien.IsConnected() or alien.GetPort() == 0:
+        print("Could not connect", file=sys.stderr)
+        return 1
+
+    grid_home = Path(alien.GetHomeDirectory())
+    xml_path = f"{grid_home}/{args.grid_xml_file}/output/Stage_{args.stage}.xml"
+
+    print("Loading xml", xml_path)
+    env = environ.copy()
+    env['alien_MODE'] = "GRID"
+    proc = sh.alien_cat(xml_path, _env=env)
+    xml_txt = proc.stdout.decode()
+
+    stage_xml = ElementTree.fromstring(xml_txt)
+
+    paths = [Path(f.attrib['lfn']).parent
+             for f in stage_xml.findall("collection/event/file")]
+
+    with tqdm(total=len(paths)) as pbar:
+        for dirs in partition_all(20, paths):
+            dirs_str = ' '.join(map(str, dirs))
+            try:
+                sh.alien_rmdir(dirs_str)
+            except sh.ErrorReturnCode_1:
+                pass
+            pbar.update(len(dirs))
+
+    return 0
+
+    #ls_res = alien.Ls()
+    #l = ls_res.GetEntryList(0)
+    #l.Print()
+    #print(list(l))
+    # for i in iter(ls_res.MakeIterator().Next, None):
+    #     for m in iter(i.MakeIterator().Next, None):
+    #         print(m.GetValue("path"))
+
+
+    print(path)
+    a = sh.alien_find(path, 'Stage')
+    for i in a.stdout:
+        print("i", i)
+    #  "190306-055447-posfield-1"
+    return
+
+    work_dir = grid_home / Path(args.grid_dir)
+    work_output_dir = work_dir / 'output'
+
+    def _abc(item):
+        yield o
+
+    def _jd_cmd(item, cmd, success, code):
+        #print('item', item)
+        jdl = ParsedJdl(cmd.stdout.decode())
+        #print(jdl.masterjob)
+        #print(type(txt))
+        #print('---')
+        if jdl.data['Executable'].endswith("analysis_merge.sh"):
+            xml_file, *_ = jdl.data['Arguments'].split(' ')
+            print("xml_file", xml_file)
+            for filepath in jdl.data['InputFile']:
+                if filepath.endswith(xml_file):
+                    merge_xml_file = filepath.lstrip("LF:")
+                    break
+            else:
+                print("Expected merge file...")
+                return
+
+            #cmd = "aliensh -c %r" % cmd
+            from os import environ
+            env = environ.copy()
+            env['alien_MODE'] = 'GRID'
+            c = sh.alien_cat(merge_xml_file, _env=env)
+            xml_content = c.stdout.decode()
+            merge_xml = ElementTree.fromstring(xml_content)
+            for m in merge_xml.findall("file"):
+                print(m)
+        else:
+            print("xml_file", xml_file)
+
+            # jdl.data['InputFile']
+
+        return
+        from pprint import pprint
+        pprint(jdl.data)
+
+    # move merged results to output directory
+    ls_res = alien.Ls('%s/*/AnalysisResults.root' % work_output_dir, ' -j -n')
+    merge_dirs = []
+    fetch_jdl_jobs = []
+    for item in iter(ls_res.MakeIterator().Next, None):
+        jobid = str(item.GetValue("jobid"))
+        print("------")
+        jdl_job = sh.alien_ps('-jdl', jobid, _bg=True, _done=partial(_jd_cmd, item))
+        fetch_jdl_jobs.append(jdl_job)
+        #fetch_jdl_jobs.append(jdl_txt, _bg=True, )
+        #print(type(jdl_txt))
+        #print('jdl:%s' % jobid)
+        #print(jdl.data)
+        ##ps_res = alien.Command(cmd)
+        ##for ii in iter(ps_res.MakeIterator().Next, None):
+        ##    #print("i", ii)
+        ##    ii.Print()
+
+        ##ps.Print()
+        #print("------")
+        #path = str(item.GetValue("path"))
+        #src_path = Path(path)
+        #merge_dirs.append((jobid, src_path.parent))
+        #idx = re.search(r"(\d+)/AnalysisResults\.root$", path).group(1)
+        #dest_path = work_output_dir / f'AnalysisResults-{idx}.root'
+        #cmd = f'mv {src_path} {dest_path}'
+        ##alien_result = alien.Command(cmd)
+
+    for job in fetch_jdl_jobs:
+        wr = job.wait()
+        print('j')
+    print(merge_dirs)
+
+    return
+
+
+    output_tmpdir = work_output_dir / '000'
+
+    merged_result_file = output_tmpdir / "AnalysisResults.root"
+    dest_result_file = work_output_dir / "AnalysisResults.root"
+
+    xml_glob =  output_tmpdir / "*.xml"
+
+    result_output_dir = grid_home/ 'femtoresults' / work_output_dir.relative_to(work_output_dir.parts[0])
+
+    cmd = f"cp {merged_result_file} {dest_result_file}"
+    print(cmd)
+    print('---')
+    #alien_result = alien.Command(cmd)
+    #alien_result.Print()
+    cmd = f"cp {merged_result_file} {xml_glob} {work_output_dir}/"
+    print(cmd)
+    print('---')
+    #alien_result = alien.Command(cmd)
+    #alien_result.Print()
+
+    cmd = f"rmdir {output_tmpdir}"
+    print(cmd)
+    print('---')
+    #alien_result = alien.Command(cmd)
+    #alien_result.Print()
+
+    cmd = f"mkdir -p {result_output_dir}"
+    print(cmd)
+    print('---')
+    #alien_result = alien.Command(cmd)
+    #alien_result.Print()
+
+    cmd = f"mv {work_output_dir}/* {result_output_dir}/"
+    print(cmd)
+    print('---')
+    #alien_result = alien.Command(cmd)
+    #alien_result.Print()
+
+    cmd = f"rmdir {work_output_dir}"
+    print(cmd)
+    print('---')
+    #alien_result = alien.Command(cmd)
+    #alien_result.Print()
+
+    cmd = f"mv {work_dir}/* {result_output_dir.parent}/"
+    print(cmd)
+    print('---')
+    #alien_result = alien.Command(cmd)
+    #alien_result.Print()
+
+
+    return 0
+
+
+    results_fullpath = full_work_dir / Path('output/000/AnalysisResults.root')
+
+    results_file = TAlienFile.Open(f'alien://{results_fullpath}')
+    if not results_file:
+        print(f"Could not find file {results_fullpath}",
+              file=sys.stderr)
+        #return 1
+
+    else:
+        results_file.Close()
+        print("ok\n")
+
+
+    alien_result = alien.Command(f"")
+    alien_result.Print()
+
+    alien_result = alien.Command(f"rmdir {result_file_dest}/output/000")
+    alien_result.Print()
+
+    return 0
+
+
+
+    path = grid_home / grid_dir
+    tld, wd = grid_dir.parts
+
+    merged_result_file = path / result_file
+    cr = TFile.Cp(f"alien://{merged_result_file}", f"alien://{result_file_dest}.copy", )
+    print("copy returned:",cr)
+    # alien.Rm(f"alien:{merged_result_file} alien:{result_file_dest}")
+    return 0
+
+
+    dest = grid_home / 'results' / wd
+
+    TFile.Cp(f"alien:/{path} alien:/{dest}")
+    # TFile.Cp(f"alien:/{path} alien:/{dest}")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -307,9 +307,14 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
   // c.cuts_use_attrs = false;
   // AliFemtoESDTrackCut *track_cut = new AliFemtoESDTrackCut(static_cast<const AliFemtoESDTrackCut&>(*analysis->BuildPionCut1(c)));
 
-  // Use Pseudo-ESD Track Cut
+  // Use ESD Track cut with wide chi2-ITS
   c.cuts_use_attrs = false;
-  AliFemtoESDTrackCut *track_cut = new PseudoEsdTrackCut(static_cast<const AliFemtoESDTrackCut&>(*analysis->BuildPionCut1(c)));
+  auto *track_cut = static_cast<AliFemtoESDTrackCut *>(analysis->BuildPionCut1(c));
+  track_cut->SetMaxITSChiNdof(1000);
+
+  // Use Pseudo-ESD Track Cut
+  // c.cuts_use_attrs = false;
+  // AliFemtoESDTrackCut *track_cut = new PseudoEsdTrackCut(static_cast<const AliFemtoESDTrackCut&>(*analysis->BuildPionCut1(c)));
 
   // Use PrimaryPionCut
   // auto *track_cut = new PrimaryPionCut(*static_cast<AliFemtoTrackCutPionPionIdealAK*>(analysis->FirstParticleCut()));

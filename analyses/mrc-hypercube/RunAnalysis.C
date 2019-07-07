@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iostream>
 
+
 std::set<TString>
 load_files(std::string filename)
 {
@@ -30,14 +31,16 @@ load_files(std::string filename)
   return result;
 }
 
-void setup_grid(AliAnalysisManager *mgr, TString workdir)
+
+void
+setup_grid(AliAnalysisManager *mgr, TString workdir)
 {
   auto *alien = new AliAnalysisAlien();
   alien->SetRunMode("full");
-  alien->SetRunMode("terminate");
+  //alien->SetRunMode("terminate");
   alien->SetGridOutputDir("output");
   alien->SetGridWorkingDir(workdir);
-  alien->SetAliPhysicsVersion("vAN-20190626_ROOT6-1");
+  alien->SetAliPhysicsVersion("vAN-20190701_ROOT6-1");
   alien->SetDropToShell(false);
   alien->SetCheckCopy(false);
   alien->SetMaxMergeFiles(7);
@@ -64,9 +67,11 @@ void setup_grid(AliAnalysisManager *mgr, TString workdir)
   }
   // alien->AddDataFile("/alice/cern.ch/user/a/akubera/xml/ae190dbdb6da2271f8dd14c1e5b8536d.xml");
   // alien->AddDataFile("/alice/cern.ch/user/a/akubera/job-20190623181107/246675_246808.xml");
+  // alien->AddDataFile("/alice/cern.ch/user/a/akubera/job-20190630183405/246844_246991.xml");
 
   mgr->SetGridHandler(alien);
 }
+
 
 void
 RunAnalysis(TString wd="")
@@ -103,7 +108,10 @@ RunAnalysis(TString wd="")
   mgr->AddTask(femtotask);
   femtotask->SetupContainers();
 
-#if false
+
+#define RUN_GRID true
+
+#if RUN_GRID
   setup_grid(mgr, wd);
 
   mgr->InitAnalysis();
@@ -125,6 +133,8 @@ RunAnalysis(TString wd="")
   timer.Stop();
   timer.Print();
 
+#if !RUN_GRID
   TString outfile = wd + "/" + mgr->GetCommonFileName();
   std::cout << "Output written to " << outfile << "\n";
+#endif
 }
