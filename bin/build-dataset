@@ -6,9 +6,11 @@
 import os
 import sys
 import subprocess as sp
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from xml.etree import ElementTree
 
+from tqdm import tqdm
 
 def arg_parser():
     from argparse import ArgumentParser
@@ -24,6 +26,20 @@ def main(argv=None):
     from ROOT import TGrid, TAlienCollection
 
     grid = TGrid.Connect("alien://")
+    if not grid:
+        print("Error: Not in alien environment", file=sys.stderr)
+        return 1
+    gridhome = Path(grid.GetHomeDirectory())
+
+    try:
+        alien_find = sp.check_output('which alien_find', shell=True, encoding='utf-8').strip()
+    except sp.CalledProcessError:
+        print("Error: Could not find alien_find executable", file=sys.stderr)
+        return 1
+
+
+    from zipfile import ZipFile
+
 
     # data_path = '/alice/sim/2016/LHC16i3a/246217'
 
@@ -32,43 +48,126 @@ def main(argv=None):
     production_path = '/alice/sim/2018/LHC18e1'
     file_pattern = '/AOD198/*/AliAOD.root'
 
-    runs = {245954, 245700, 245829, 246087, 245831, 245705, 246089, 246217, 245833, 245963, 246222, 246225}
+    runs = {245954, 245700, 245829, 246087, 245831, 245705, 246089, 246217, 245833, 245963}
+    runs = {246042, 246048, 245793, 246178, 246049, 246053, 246182, 246181, 245683, 245692, 245949, 245952,}
+    runs = {245954, 245700, 245829, 246087, 245831, 245705, 246089, 246217, 245833, 245963, 246222, 246225, }
+    runs = {246675, 246676, 246805, 246804, 246807, 246424, 246808, 246809, 246428, 246431, 246945, 246434,}
+    runs = { 246272, 246275, 246148, 246276, 245766, 246151, 246152, 246153, 245775, 246036, 246037, 245785,
+     246042, 246048, 245793, 246178, 246049, 246053, 246182, 246181, 245683, 245692, 245949, 245952,
+     245954, 245700, 245829, 246087, 245831, }
 
-    queries = [grid.Query(production_path + f'/{run}', file_pattern) for run in runs]
-    collections = [TAlienCollection.OpenQuery(q) for q in queries]
+    collection_info = f'{production}:file_pattern:{runs}'
+    # print(ElementTree.tostring(xml).decode())
 
-    collection = collections.pop()
-    collection.Status()
+
+    from hashlib import md5
+    def get_hashname(prod, patt, run):
+        if isinstance(run, int):
+            runs = (run, )
+        else:
+            runs = sorted(run)
+
+        key = ':'.join((prod, patt, ','.join(map(str, sorted(runs)))))
+
+        md5hash = md5()
+        md5hash.update(key.encode())
+        return md5hash.hexdigest()
+
+    def build_xml_dataset(zf, prod, patt, run):
+        listhash = get_hashname(production, file_pattern, runs)
+        name = listhash + '.xml'
+
+        try:
+            return zf.read(name)
+        except KeyError:
+            pass
+
+        with TemporaryDirectory() as tmpdir:
+
+            tmp = Path(tmpdir).absolute()
+
+            filenames = []
+
+            print("fetching runs:")
+
+            for run in tqdm(runs):
+                runname = get_hashname(production, file_pattern, run) + '.xml'
+                runpath = tmp / runname
+                try:
+                    filename = zf.extract(runname, path=tmp)
+                except KeyError:
+                    pass
+                else:
+                    filenames.append(filename)
+                    continue
+
+                data_path = prod + '/%d' % run
+                coll = '%s=%s:%s' % (runpath.stem, production, run)
+                file_data = sp.check_output([alien_find, '-x', coll, data_path, patt], stderr=sp.DEVNULL)
+                xml = ElementTree.fromstring(file_data)
+                xmlbytes = ElementTree.tostring(xml)
+                zf.writestr(runname, xmlbytes)
+                runpath.write_bytes(xmlbytes)
+                filenames.append(str(runpath))
+
+            # merge collection
+            collections = [TAlienCollection.Open(filename) for filename in filenames]
+
+            merged_collection = collections.pop()
+            for coll in collections:
+                merged_collection.AddFast(coll)
+
+            print('Adding merged collection:', name)
+
+            local_filepath = tmp / name
+            collection_name = 'collection-' + listhash
+            local_url = "file://%s" % local_filepath
+            # comment = 'runlist:%s:%r' % (prod, sorted(runs))
+            merged_collection.ExportXML(local_url, False, False, collection_name, collection_info)
+
+            # merged_xml = ElementTree.parse(local_filepath)
+            # data = ElementTree.tostring(merged_xml)
+            data = local_filepath.read_bytes()
+            zf.writestr(name, data)
+
+            print('Uploading collection xml', name)
+            remote_url = f'alien://{gridhome / "xml" / name}'
+            sp.check_output(["alien_cp", str(local_filepath), remote_url])
+            # sh.alien_cp(str(runlist_localpath), str(runlist_gridurl))
+
+            # print("uploading to", remote_url)
+            # merged_collection.ExportXML(remote_url, False, False, collection_name, comment)
+
+        return data
+
+
+    with ZipFile("xml-cache.zip", "a") as zf:
+        xmldata = build_xml_dataset(zf, production_path, file_pattern, runs)
+
+    # for run in runs:
+    #     runhashname = get_hashname(production, file_pattern, run)
+
+    # queries = [grid.Query(production_path + f'/{run}', file_pattern) for run in runs]
+    # collections = [TAlienCollection.OpenQuery(q) for q in queries]
+
+    # collection = collections.pop()
+    # collection.Status()
 
     # q = grid.Query(data_path, file_pattern)
     # collection = TAlienCollection.OpenQuery(w)
     # collections = []
 
     # merge collection
-    for c in collections:
-        collection.AddFast(c)
+    # for c in collections:
+    #     collection.AddFast(c)
 
-    collection.Status()
-
-    data_id = ':'.join((production_path, file_pattern, ','.join(map(str, sorted(runs)))))
-    from hashlib import md5
-    md5hash = md5()
-    md5hash.update(data_id.encode())
-    data_hash = md5hash.hexdigest()
-
-    collection_name = f'{production}:{runs}'
+    # collection.Status()
 
     # upload collection to grid
-    dest = f"alien:///alice/cern.ch/user/a/akubera/xml/{data_hash}.xml"
-    collection.ExportXML(dest, False, False, collection_name, "Created By AliMaster")
+    # dest = f"alien:///alice/cern.ch/user/a/akubera/xml/{data_hash}.xml"
+    # collection.ExportXML(dest, False, False, collection_name, "Created By AliMaster")
 
     return 0
-
-    try:
-        alien_find = sp.check_output('which alien_find', shell=True, encoding='utf-8').strip()
-    except sp.CalledProcessError:
-        print("Erro: Not in alien environment", file=sys.stderr)
-        return 1
 
     # with TemporaryDirectory() as tmpdir:
         # os.chdir(tmpdir)
@@ -77,10 +176,6 @@ def main(argv=None):
 
 
     # tempfile.NamedTemporaryFile('w')
-    file_data = sp.check_output([alien_find, '-x', collection_name, data_path, file_pattern], stderr=sp.DEVNULL)
-    xml = ElementTree.fromstring(file_data)
-
-    print(ElementTree.tostring(xml).decode())
 
     # if sp.run("which alien_find", shell=True).returncode != 0:
     #     print("Erro: Not in alien environment", file=sys.stderr)
