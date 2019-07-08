@@ -183,10 +183,10 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
   // auto *track_cut = static_cast<AliFemtoESDTrackCut*>(analysis->BuildPionCut1(c));
   // c.cuts_use_attrs = true;
 
-  // //auto *track_cut = new PrimaryPionCut();
+  auto *track_cut = new PrimaryPionCut();
   // // auto *track_cut = new AliFemtoTrackCutPionPionIdealAK();
-  // analysis->SetFirstParticleCut(track_cut);
-  // analysis->SetSecondParticleCut(track_cut);
+  analysis->SetFirstParticleCut(track_cut);
+  analysis->SetSecondParticleCut(track_cut);
 
   // auto *ff = new AliFemtoModelManager();
   // auto *wg = new AliFemtoModelWeightGeneratorBasic();
@@ -238,14 +238,14 @@ ConfigFemtoAnalysis()
   AddEventReader(*manager);
 
   AFAPP::CutParams ccfg;
-  ccfg.cuts_use_attrs = false;
+  ccfg.cuts_use_attrs = true;
   ccfg.mc_pion_only = true;
   ccfg.pion_1_rm_neg_lbl = true;
   ccfg.pion_1_status = 16;
   ccfg.pion_1_max_impact_xy = 0.04;
   ccfg.pion_1_max_impact_z = 0.05;
-  ccfg.pion_1_sigma = 3.0;
-  ccfg.pion_1_min_its_ncls = 5;
+  ccfg.pion_1_sigma = 2.5;
+  ccfg.pion_1_min_its_ncls = 4;
   ccfg.pion_1_max_its_chi_ndof = 1.6;
   ccfg.pion_1_max_tpc_chi_ndof = 1.6;
   ccfg.pion_1_min_tpc_chi_ndof = 0.33;
@@ -262,8 +262,8 @@ ConfigFemtoAnalysis()
   acfg.pion_type_1 = AFAPP::kPiPlus;
   AddAnalysis("AnalysisMrc_pip", acfg, ccfg, *manager);
 
-  // acfg.pion_type_1 = AFAPP::kPiMinus;
-  // AddAnalysis("AnalysisMrc_pim", acfg, ccfg, *manager);
+  acfg.pion_type_1 = AFAPP::kPiMinus;
+  AddAnalysis("AnalysisMrc_pim", acfg, ccfg, *manager);
 
   return manager;
 }
