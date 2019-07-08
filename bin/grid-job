@@ -114,26 +114,33 @@ def main(argv=None):
 
 
 def new_job(args):
-    sys.path.insert(0, '.')
+    sys.path.insert(0, 'alimaster')
+    sys.path.insert(1, '.')
+
+    from alimaster import x
+    from femtoanalysis import JobDescriptionLoader
+
+
+    from ROOT import TAlienCollection, TAlien, TFile
+    alien = TAlien.Connect("alien://")
+    if not alien:
+        print("Error: Could not connect to alien grid", file=sys.stderr)
+        return 1
+
+    gridhome = alien.GetHomeDirectory()
+    if not gridhome:
+        print("Could not load grid home directory", file=sys.stderr)
+        return 1
 
     tag = args.tag or '%X' % int(f'{datetime.utcnow():%y%j%H%M%S}')
 
     print(f"Creating new job: {tag!r} from file {args.jfile.name!r}")
 
-    from femtoanalysis import JobDescriptionLoader
 
     job_data = JobDescriptionLoader(tag, args.jfile)
 
     print("dataset:", job_data.production)
     print("splitting runlists:")
-
-    from ROOT import TAlienCollection, TAlien, TFile
-
-    alien = TAlien.Connect("alien://")
-    gridhome = alien.GetHomeDirectory()
-    if not gridhome:
-        print("Could not load grid home directory", file=sys.stderr)
-        return 1
 
     gridhomepath = Path(gridhome)
     print("Begin copy necessary xml files")
