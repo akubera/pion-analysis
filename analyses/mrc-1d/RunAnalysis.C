@@ -45,11 +45,11 @@ setup_grid(AliAnalysisManager *mgr, TString workdir)
 #endif
   alien->SetGridOutputDir("output");
   alien->SetGridWorkingDir(workdir);
-  alien->SetAliPhysicsVersion("vAN-20190705_ROOT6-1");
+  alien->SetAliPhysicsVersion("vAN-20190708_ROOT6-1");
   alien->SetDropToShell(false);
   alien->SetCheckCopy(false);
-  alien->SetMaxMergeFiles(17);
-  alien->SetMaxMergeStages(3);
+  alien->SetMaxMergeFiles(20);
+  alien->SetMaxMergeStages(10);
   alien->SetSplitMaxInputFileNumber(15);
   alien->SetNrunsPerMaster(30);
   alien->SetMergeViaJDL(true);
@@ -89,7 +89,7 @@ setup_grid(AliAnalysisManager *mgr, TString workdir)
   // alien->AddDataFile("/alice/cern.ch/user/a/akubera/xml/ae190dbdb6da2271f8dd14c1e5b8536d.xml");
   // alien->AddDataFile("/alice/cern.ch/user/a/akubera/job-20190623181107/246675_246808.xml");
   // alien->AddDataFile("/alice/cern.ch/user/a/akubera/job-20190630183405/246844_246991.xml");
-  alien->AddDataFile("/alice/cern.ch/user/a/akubera/xml/a404dfae1b1e3b9b96e69e59a5fd0d8b.xml");
+  alien->AddDataFile("/alice/cern.ch/user/a/akubera/xml/4f764ae3df84662c7af07f75f3cb4a71.xml");
 
   mgr->SetGridHandler(alien);
 }
