@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+#
+# analysis
+#
+
+import os
+import sys
+import json
+import logging
+import shutil
+from hashlib import md5
+from pathlib import Path
+from pprint import pprint
+from datetime import datetime
+from contextlib import contextmanager
+
+import yaml
+import sh
+
+
+def arg_parser():
+    from argparse import ArgumentParser, FileType
+    parser = ArgumentParser()
+
+    subparsers = parser.add_subparsers(title='COMMAND')
+
+    ls_parser = subparsers.add_parser("ls")
+    ls_parser.set_defaults(func=main_ls)
+
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+    args.func(args)
+
+
+
+def main_ls(args):
+    analysis_dir = Path("analyses")
+    for f in analysis_dir.glob('*'):
+        if f.name.startswith('.'):
+            continue
+        print(f.name)
+
+
+@contextmanager
+def lockdir(path: Path, wait=False):
+    from time import sleep
+
+    path = path.absolute()
+
+    has_printed_warning = False
+    while True:
+        try:
+            path.mkdir()
+        except FileExistsError:
+            if not wait:
+                raise
+            if not has_printed_warning:
+                print("Waiting for directory lock.")
+                has_printed_warning = True
+        else:
+            break
+
+    try:
+        (path / 'pid').write_text(f'{os.getpid()}')
+        yield path
+    finally:
+        shutil.rmtree(path)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
