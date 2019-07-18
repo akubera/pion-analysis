@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+#
+# run-analysis
+#
+
+
+import sys
+from pathlib import Path
+
+
+def arg_parser():
+    from argparse import ArgumentParser, FileType
+    parser = ArgumentParser()
+    parser.add_argument("analysis_name",
+                        help='Name of analysis directory to run')
+    parser.add_argument("--config",
+                        type=FileType('r'),
+                        help='Config')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+
+    args = arg_parser().parse_args(argv)
+
+    analysis_path = Path(args.analysis_name)
+
+    if not analysis_path.exists():
+        print("Analysis path '%s' does not exist" % args.analysis_name,
+              file=sys.stderr)
+        return 1
+
+    if analysis_path.is_dir():
+        analysis_file = analysis_path / 'Analysis.C'
+
+        if not analysis_file.exists():
+            print(f"Requested analysis path '{args.analysis_name}' is missing "
+                   "an Analysis.C file", file=sys.stderr)
+            return 1
+
+        print("Running new %s analysis" % analysis_path.stem)
+        setup_analysis(analysis_file)
+
+
+def setup_analysis(analysis_file):
+    from ROOT import gROOT, gSystem
+    from ctypes import c_int
+
+    gSystem.SetBuildDir(".root-build-cache")
+
+    err = c_int(0)
+    gROOT.LoadMacro(str(analysis_file) + "", err)
+    if err:
+        return 1
+
+    from ROOT import Analysis
+
+    print("Found Analysis: ", Analysis.name())
+
+
+if __name__ == "__main__":
+    exit(main())
