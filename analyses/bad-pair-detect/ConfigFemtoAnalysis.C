@@ -16,6 +16,8 @@
 #include <AliFemtoModelManager.h>
 #include <AliFemtoModelWeightGeneratorBasic.h>
 
+#include <AliFemtoESDTrackCut.h>
+
 
 using AFAPP = AliFemtoAnalysisPionPion;
 
@@ -268,6 +270,145 @@ struct PseudoEsdTrackCut : public AliFemtoTrackCutPionPionIdealAK, public AliFem
     { return "PseudoEsdTrackCut"; }
 };
 
+
+struct BadPairCut : public AliFemtoPairCutPionPionAKDetaDphi {
+
+  BadPairCut(const AliFemtoPairCutPionPionAKDetaDphi &orig)
+    : AliFemtoPairCutPionPionAKDetaDphi(orig)
+    { }
+
+  virtual bool Pass(const AliFemtoPair *pair)
+    {
+      // return AliFemtoPairCutPionPionAKDetaDphi::Pass(pair);
+      const auto
+        &track1 = *pair->Track1()->Track(),
+        &track2 = *pair->Track2()->Track();
+
+      auto is_selected_track = [] (const AliFemtoTrack &track)
+        {
+          auto *info = static_cast<AliFemtoModelHiddenInfo*>(track.GetHiddenInfo());
+          if (info->GetPDGPid() == -211) {
+            return true;
+          }
+          // double p = track.P().Mag();
+          // if (std::fabs(p - 0.14589) < 6e-5) {
+          //   return true;
+          // }
+          return false;
+        };
+
+      if (is_selected_track(track1) || is_selected_track(track2)) {
+        return AliFemtoPairCutPionPionAKDetaDphi::Pass(pair);
+      }
+
+      return false;
+    }
+
+  virtual const char* ClassName() const
+    {
+      return "BadPairCut";
+    }
+};
+
+
+struct BadPairFinder : public AliFemtoModelCorrFctn {
+  BadPairFinder()
+    : AliFemtoModelCorrFctn()
+    {
+  delete fNumeratorTrue;
+  fNumeratorTrue = nullptr;
+  delete fNumeratorFake;
+  fNumeratorFake = nullptr;
+  delete fDenominator;
+  fDenominator = nullptr;
+  delete fNumeratorTrueIdeal;
+  fNumeratorTrueIdeal = nullptr;
+  delete fNumeratorFakeIdeal;
+  fNumeratorFakeIdeal = nullptr;
+  delete fDenominatorIdeal;
+  fDenominatorIdeal = nullptr;
+
+  delete fQgenQrec;
+  fQgenQrec = nullptr;
+    }
+
+  virtual ~BadPairFinder()
+    { }
+
+  void AddPair(const AliFemtoPair &pair)
+    {
+      const auto
+        &track1 = *pair.Track1(),
+        &track2 = *pair.Track2();
+
+      const auto
+        *info1 = (AliFemtoModelHiddenInfo*)track1.GetHiddenInfo(),
+        *info2 = (AliFemtoModelHiddenInfo*)track2.GetHiddenInfo();
+
+      const auto
+        &mp1 = *info1->GetTrueMomentum(),
+        &mp2 = *info2->GetTrueMomentum(),
+
+        *op1 = track1.Track()->GetTrueMomentum(),
+        *op2 = track2.Track()->GetTrueMomentum();
+
+      const AliFemtoLorentzVector
+        tp1(mp1, mp1.MassHypothesis(info1->GetMass())),
+        tp2(mp2, mp2.MassHypothesis(info2->GetMass())),
+
+        &p1 = track1.FourMomentum(),
+        &p2 = track2.FourMomentum();
+
+      const double
+        qinv = - (p1 - p2).m(),
+        true_qinv = - (tp1 - tp2).m();
+
+      const auto
+        &mom1 = track1.Track()->P(),
+        &mom2 = track2.Track()->P();
+
+      if (true_qinv > 0.4 and qinv <= (true_qinv - 0.3)) {
+        std::cout << "Found bad pair!"
+                  << "\n"
+                  << Form(" q: (%0.5f, %0.5f)", true_qinv, qinv)
+                  // << Form(" truep: (%0.5f, %0.5f)", mp1.Mag(), mp2.Mag())
+                  << "\n"
+                  << "    p: " << Form("<%g,%g,%g: %g>", mom1.x(), mom1.y(), mom1.z(), mom1.Mag())
+                    << " "  << Form("<%g,%g,%g: %g>", mom2.x(), mom2.y(), mom2.z(), mom2.Mag())
+                  << "\n"
+                  << " true: " << Form("<%g,%g,%g: %g>", mp1.x(), mp1.y(), mp1.z(), mp1.Mag())
+                    << " "  << Form("<%g,%g,%g: %g>", mp2.x(), mp2.y(), mp2.z(), mp2.Mag())
+                  // << " truep: " << mp1 << "," << mp2
+                  << " otruep: (" << (op1 ? Form("%0.5f", op1->Mag()) : "NULL") << ", " << (op2 ? Form("%0.5f", op2->Mag()) : "NULL") << ")"
+                  // << Form(" otruep: (%0.5f, %0.5f)", track1.Track()->GetTrueMomentum()->Mag(), track2.Track()->GetTrueMomentum()->Mag())
+                  // << Form(" p: (%0.5f, %0.5f)", track1.Track()->P().Mag(), track2.Track()->P().Mag())
+                  << "\n"
+                  << "  PDG: " << info1->GetPDGPid() << ", " << info2->GetPDGPid()
+                  << " Mother: " << info1->GetMotherPdgCode() << ", " << info2->GetMotherPdgCode()
+                  << " Origin: " << info1->GetOrigin() << ", " << info2->GetOrigin()
+                  << " TpcChi2:" << track1.Track()->TPCchi2perNDF() << ", " << track2.Track()->TPCchi2perNDF()
+                  << " ItsChi2:" << track1.Track()->ITSchi2perNDF() << ", " << track2.Track()->ITSchi2perNDF() << "\n"
+                  << "\n";
+      }
+    }
+
+  void AddRealPair(AliFemtoPair *pair) override
+    {
+      AddPair(*pair);
+    }
+
+  void AddMixedPair(AliFemtoPair *pair) override
+    {
+      AddPair(*pair);
+    }
+
+  TList* GetOutputList() override
+    {
+      return new TList();
+    }
+};
+
+
 // static const ULong_t filter_mask = BIT(5) | BIT(6);
 static const ULong_t filter_mask = BIT(7);
 // static const ULong_t filter_mask = BIT(8);
@@ -291,76 +432,25 @@ AddEventReader(AliFemtoManager &mgr)
   mgr.SetEventReader(rdr);
 }
 
-
 void
 AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoManager &m)
 {
   AliFemtoAnalysisPionPion *analysis = new AliFemtoAnalysisPionPion(name, a, c);
   analysis->SetTrackFilter(filter_mask);
 
-
-  // Use ESD Track cut
-  // c.cuts_use_attrs = false;
-  // auto *track_cut = analysis->BuildPionCut1(c);
-
-  // Use Copy of ESD Track cut
-  // c.cuts_use_attrs = false;
-  // AliFemtoESDTrackCut *track_cut = new AliFemtoESDTrackCut(static_cast<const AliFemtoESDTrackCut&>(*analysis->BuildPionCut1(c)));
-
-  // Use ESD Track cut with wide chi2-ITS
-  c.cuts_use_attrs = false;
-  auto *track_cut = static_cast<AliFemtoESDTrackCut *>(analysis->BuildPionCut1(c));
-  track_cut->SetMaxITSChiNdof(1000);
-
-  // Use Pseudo-ESD Track Cut
-  // c.cuts_use_attrs = false;
-  // AliFemtoESDTrackCut *track_cut = new PseudoEsdTrackCut(static_cast<const AliFemtoESDTrackCut&>(*analysis->BuildPionCut1(c)));
-
-  // Use PrimaryPionCut
-  // auto *track_cut = new PrimaryPionCut(*static_cast<AliFemtoTrackCutPionPionIdealAK*>(analysis->FirstParticleCut()));
-  // track_cut->status = 16;
-
-
-  analysis->SetFirstParticleCut(track_cut);
-  analysis->SetSecondParticleCut(track_cut);
-  // track_cut->ncls_its_min = 4;
-  // track_cut->pt_range = {0.14, 2.0};
-  // track_cut->eta_range = {-0.4, 0.4};
-  // track_cut->nsigma_pion = 1.0;
-  // track_cut->max_xy = 0.05;
-  // track_cut->max_z = 0.05;
+  auto *pair_cut = new BadPairCut(*static_cast<AliFemtoPairCutPionPionAKDetaDphi*>(analysis->PairCut()));
+  analysis->SetPairCut(pair_cut);
 
   auto *ff = new AliFemtoModelManager();
   auto *wg = new AliFemtoModelWeightGeneratorBasic();
   ff->AcceptWeightGenerator(wg);
 
-  auto *mrc_cf_1d = new AliFemtoModelCorrFctn("TrueQinv", 200, 0.0, 1.0);
+  auto *mrc_cf_1d = new AliFemtoModelCorrFctn("TrueQinv", 350, 0.0, 1.2);
   mrc_cf_1d->ConnectToManager(ff);
+  analysis->AddCorrFctn(mrc_cf_1d);
 
-  auto *ktmrc1d = new AliFemtoKtBinnedCorrFunc("KT_MRC1D", mrc_cf_1d);
-
-
-  // analysis->AddCorrFctn(mrc_cf_1d);
-
-  auto *mrc_cf = new AliFemtoModelCorrFctnTrueQ6D("MRC",
-                  // 22, 0.0, 0.1125,
-                  // 45, -0.1125, 0.1125,
-                  // 45, -0.1125, 0.1125);
-                  26, 0.0, 0.1325,
-                  53, -0.1325, 0.1325,
-                  53, -0.1325, 0.1325);
-  auto *ktmrc = new AliFemtoKtBinnedCorrFunc("KT_HYPERCUBE", mrc_cf);
-#if true
-  const std::vector<std::pair<float, float>> ktbins = {{0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}, {1.0, 1.2}};
-#else
-  const std::vector<std::pair<float, float>> ktbins = {{0.3, 0.4}, {0.5, 0.6}, {0.7, 0.8}, {0.8, 1.0}};
-#endif
-
-  ktmrc1d->AddKtRanges(ktbins);
-  ktmrc->AddKtRanges(ktbins);
-
-  analysis->AddCorrFctn(ktmrc1d);
-  // analysis->AddCorrFctn(ktmrc);
+  auto *badpair_cf = new BadPairFinder();
+  analysis->AddCorrFctn(badpair_cf);
 
   analysis->AddStanardCutMonitors();
   m.AddAnalysis(analysis);
@@ -381,10 +471,15 @@ ConfigFemtoAnalysis()
   ccfg.pion_1_status = 16;
   ccfg.event_CentralityMin = 0.0;
   ccfg.event_CentralityMax = 90.0;
+  ccfg.pion_1_PtMin = 0.10;
+  ccfg.pion_1_min_its_ncls = 3;
+  ccfg.pion_1_max_its_chi_ndof = 2.50;
+  ccfg.pion_1_max_tpc_chi_ndof = 2.60;
+  ccfg.pion_1_min_tpc_chi_ndof = 0.30;
 
   AFAPP::AnalysisParams acfg = AFAPP::DefaultConfig();
   acfg.pion_type_2 = AFAPP::kNone;
-  acfg.num_events_to_mix = 7;
+  acfg.num_events_to_mix = 12;
   acfg.enable_pair_monitors = false;
   acfg.is_mc_analysis = true;
   // acfg.calc_automult(ccfg);
