@@ -45,7 +45,7 @@ setup_grid(AliAnalysisManager *mgr, TString workdir)
 #endif
   alien->SetGridOutputDir("output");
   alien->SetGridWorkingDir(workdir);
-  alien->SetAliPhysicsVersion("vAN-20190708_ROOT6-1");
+  alien->SetAliPhysicsVersion("vAN-20190728_ROOT6-1");
   alien->SetDropToShell(false);
   alien->SetCheckCopy(false);
   alien->SetMaxMergeFiles(20);
