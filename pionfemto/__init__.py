@@ -1,5 +1,5 @@
 #
-# femtoanalysis/__init__.py
+# pionfemto/__init__.py
 #
 
 from typing import List

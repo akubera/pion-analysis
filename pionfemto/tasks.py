@@ -1,5 +1,5 @@
 #
-# femtoanalysis/tasks.py
+# pionfemto/tasks.py
 #
 
 # from femtoanalysis.task import Task
