@@ -39,12 +39,8 @@ bool select_particle(TLorentzVector x, TLorentzVector p)
 
 
 void
-RunFemto(TTree &tree)
+RunFemto(TTree &tree, TString output_filename, int event_limit=-1)
 {
-  std::cout << tree.GetName() << "\n";
-
-  // TTreeReader rg(tree);
-  // TTreeReaderValue<float> px(rg, "px");
   TTreeReader tr(&tree);
   TTreeReaderValue<float>
     E(tr, "particle.e"),
@@ -107,9 +103,9 @@ RunFemto(TTree &tree)
         }
         // assert(particle_vector.size() == 0);
 
-        if (elimit-- == 0) {
-          break;
-        }
+      if (event_limit-- == 0) {
+        break;
+      }
 
         phi = get_rndm_phi(gen);
         prev_eid = *eid;
@@ -151,7 +147,7 @@ RunFemto(TTree &tree)
     runners[0].den->Add(runners[i].den.get());
   }
 
-  TFile ofile("ofile.root", "RECREATE");
+  TFile ofile(output_filename, "RECREATE");
 
   runners[0].num->Write();
   runners[0].den->Write();
