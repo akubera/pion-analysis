@@ -133,7 +133,7 @@ ConfigFemtoAnalysis()
   AddEventReader(*manager);
 
   AFAPP::CutParams ccfg;
-  ccfg.cuts_use_attrs = false;
+  ccfg.cuts_use_attrs = true;
   ccfg.mc_pion_only = true;
   ccfg.pion_1_rm_neg_lbl = true;
   ccfg.pion_1_status = 16;
