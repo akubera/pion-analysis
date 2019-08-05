@@ -46,19 +46,6 @@ struct PrimaryPionCut : public AliFemtoTrackCutPionPionIdealAK {
     { return "PrimaryPionCut"; }
 };
 
-struct HupPionCut : public AliFemtoESDTrackCut {
-public:
-
-  HupPionCut()
-    : AliFemtoESDTrackCut()
-    {}
-
-  virtual ~HupPionCut()
-    {}
-
-  virtual const char* ClassName() const
-    { return "HupPionCut"; }
-};
 
 static const ULong_t filter_mask = BIT(7);
 // static const ULong_t filter_mask = BIT(8);
@@ -89,7 +76,7 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
 {
   AliFemtoAnalysisPionPion *analysis = new AliFemtoAnalysisPionPion(name, a, c);
   analysis->SetTrackFilter(filter_mask);
-
+/*
   c.cuts_use_attrs = false;
   auto *track_cut = static_cast<AliFemtoESDTrackCut*>(analysis->BuildPionCut1(c));
   c.cuts_use_attrs = true;
@@ -98,37 +85,37 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
   // auto *track_cut = new AliFemtoTrackCutPionPionIdealAK();
   analysis->SetFirstParticleCut(track_cut);
   analysis->SetSecondParticleCut(track_cut);
+*/
 
-  auto *ff = new AliFemtoModelManager();
-  auto *wg = new AliFemtoModelWeightGeneratorBasic();
-  ff->AcceptWeightGenerator(wg);
-
-  auto *mrc_cf_1d = new AliFemtoModelCorrFctn("TrueQinv", 200, 0.0, 1.0);
-  mrc_cf_1d->ConnectToManager(ff);
-
-  auto *ktmrc1d = new AliFemtoKtBinnedCorrFunc("KT_MRC1D", mrc_cf_1d);
-
-  // analysis->AddCorrFctn(mrc_cf_1d);
-
-  auto *mrc_cf = new AliFemtoModelCorrFctnTrueQ6D("MRC",
-                  // 22, 0.0, 0.1125,
-                  // 45, -0.1125, 0.1125,
-                  // 45, -0.1125, 0.1125);
-                  30, 0.0, 0.1525,
-                  61, -0.1525, 0.1525,
-                  61, -0.1525, 0.1525);
-
-  auto *ktmrc = new AliFemtoKtBinnedCorrFunc("KT_HYPERCUBE", mrc_cf);
 #if true
   const std::vector<std::pair<float, float>> ktbins = {{0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}};
 #else
   const std::vector<std::pair<float, float>> ktbins = {{0.3, 0.4}, {0.5, 0.6}, {0.7, 0.8}, {0.8, 1.0}, {1.0, 1.2}};
 #endif
 
+  auto *ff = new AliFemtoModelManager();
+  auto *wg = new AliFemtoModelWeightGeneratorBasic();
+  ff->AcceptWeightGenerator(wg);
+
+  auto *mrc_cf_1d = new AliFemtoModelCorrFctnQinv("TrueQinv", 200, 0.0, 1.0);
+  mrc_cf_1d->ConnectToManager(ff);
+
+  auto *ktmrc1d = new AliFemtoKtBinnedCorrFunc("KT_MRC1D", mrc_cf_1d);
   ktmrc1d->AddKtRanges(ktbins);
-  ktmrc->AddKtRanges(ktbins);
 
   analysis->AddCorrFctn(ktmrc1d);
+
+  int out_nbins = 32;
+  double out_max = out_nbins * (0.1125 / 22);
+  auto *mrc_cf = new AliFemtoModelCorrFctnTrueQ6D("MRC",
+                  out_nbins, 0, out_max,
+                  61, -0.1525, 0.1525,
+                  61, -0.1525, 0.1525);
+
+  auto *ktmrc = new AliFemtoKtBinnedCorrFunc("KT_HYPERCUBE", mrc_cf);
+
+  ktmrc->AddKtRanges(ktbins);
+
   analysis->AddCorrFctn(ktmrc);
 
   analysis->AddStanardCutMonitors();
@@ -150,10 +137,11 @@ ConfigFemtoAnalysis()
   ccfg.mc_pion_only = true;
   ccfg.pion_1_rm_neg_lbl = true;
   ccfg.pion_1_status = 16;
-  ccfg.pion_1_max_impact_xy = 0.04;
-  ccfg.pion_1_max_impact_z = 0.05;
+  ccfg.pion_1_max_impact_xy = 0.03;
+  ccfg.pion_1_max_impact_z = 0.04;
   ccfg.pion_1_sigma = 3.0;
-  ccfg.pion_1_max_its_chi_ndof = 1.6;
+  ccfg.pion_1_min_its_ncls = 3;
+  ccfg.pion_1_max_its_chi_ndof = 2.5;
   ccfg.pion_1_max_tpc_chi_ndof = 1.6;
   ccfg.pion_1_min_tpc_chi_ndof = 0.33;
   ccfg.event_CentralityMin = 0.0;
