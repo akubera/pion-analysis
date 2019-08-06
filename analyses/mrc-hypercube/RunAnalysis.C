@@ -40,6 +40,14 @@ void usage(std::ostream &out)
        << "\n";
 }
 
+TString timestamp_workdir(TString prefix="job-")
+{
+  TDatime td;
+  const TString
+    timestamp = Form("%08d%06d", td.GetDate(), td.GetTime()),
+    workdir = prefix + timestamp;
+  return workdir;
+}
 
 std::set<TString>
 load_files(std::string filename)
@@ -120,9 +128,6 @@ AliAnalysisManager*
 CreateRunManager(TString filename)
 {
   auto *mgr = new AliAnalysisManager();
-
-  TDatime td;
-  TString timestamp = Form("%08d%06d", td.GetDate(), td.GetTime());
   mgr->SetCommonFileName(filename);
 
   gROOT->Macro("$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C");
@@ -208,6 +213,25 @@ RunMergeAnalysis(TString wd)
 
   mgr->StartAnalysis("grid");
 #else
+#endif
+
+  timer.Stop();
+  timer.Print();
+
+#if !RUN_GRID
+#endif
+*/
+}
+
+
+void
+RunLocalAnalysis(TString wd)
+{
+  gSystem->mkdir(wd);
+  gSystem->CopyFile("ConfigFemtoAnalysis.C", wd + "/ConfigFemtoAnalysis.C");
+  gSystem->cd(wd);
+  
+  auto *mgr = CreateRunManager("MrcResults.root");
   mgr->InitAnalysis();
   mgr->PrintStatus();
 
@@ -217,22 +241,9 @@ RunMergeAnalysis(TString wd)
   }
 
   mgr->StartAnalysis("local", input);
-#endif
 
-  timer.Stop();
-  timer.Print();
-
-#if !RUN_GRID
   TString outfile = wd + "/" + mgr->GetCommonFileName();
   std::cout << "Output written to " << outfile << "\n";
-#endif
-*/
-}
-
-
-void
-RunLocalAnalysis(TString wd)
-{
 }
 
 
@@ -244,6 +255,17 @@ RunAnalysis(std::vector<std::string> args)
     return;
   }
 
+  if (args[0] == "local") {
+    TString wd;
+    if (args.size() > 1) {
+      wd = args[1];
+    } else {
+      wd = timestamp_workdir("local-");
+    }
+    RunLocalAnalysis(wd);
+    return;
+  }
+    
   auto *grid = TGrid::Connect("alien://");
   if (!grid) {
     std::cerr << "Could not connect to alien.\n";
@@ -277,10 +299,7 @@ RunAnalysis(std::vector<std::string> args)
   // create new analysis
   if (args[0] == "run" || args[0] == "new") {
 
-    TDatime td;
-    const TString
-      timestamp = Form("%08d%06d", td.GetDate(), td.GetTime()),
-      workdir = "job-" + timestamp;
+    TString workdir = timestamp_workdir();
 
     std::cout << "Creating new job: " << workdir << "\n";
     RunGridAnalysis(workdir);
