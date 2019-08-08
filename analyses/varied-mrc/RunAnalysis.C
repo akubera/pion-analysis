@@ -2,10 +2,7 @@
 /// \file varied-mc/RunAnalysis.C
 ///
 
-#include <TString.h>
-#include <TDatime.h>
-#include <TChain.h>
-#include <TStopwatch.h>
+#include "../analysis-runner.hh"
 
 #include <AliAnalysisAlien.h>
 #include <AliAnalysisManager.h>
@@ -97,40 +94,20 @@ setup_grid(AliAnalysisManager *mgr, TString workdir)
 
 
 void
-RunAnalysis(TString wd="")
+usage(std::ostream &out)
 {
-  std::cout << "RunAnalysis\n";
+  out << "Usage:\n";
+}
 
-  gSystem->SetBuildDir(".rootbuild");
 
-  TStopwatch timer;
-  timer.Start();
-
-  TDatime td;
-  TString timestamp = Form("%08d%06d", td.GetDate(), td.GetTime());
-
-  auto *mgr = new AliAnalysisManager();
-
-  if (wd.IsWhitespace()) {
-    wd = "job-" + timestamp;
-  } else {
-    timestamp = wd(wd.Index('-')+1, 14);
-  }
-
-  // std::cout << timestamp << "\n" << wd << "\n";
-  gSystem->mkdir(wd);
-  gSystem->CopyFile("ConfigFemtoAnalysis.C", wd + "/ConfigFemtoAnalysis.C");
-  gSystem->cd(wd);
-
-  TString output_filename = Form("MrcResult-%s.root", timestamp.Data());
-  mgr->SetCommonFileName(output_filename);
-
+void
+AddTasks()
+{
   gROOT->Macro("$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C");
   gROOT->Macro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C(kTRUE, kTRUE, kTRUE)");
   gROOT->Macro("$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C");
 
   gROOT->LoadMacro("$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+");
-
 
   gROOT->ProcessLine(R""(
     AddNuTaskPionPionRoot6(
@@ -175,19 +152,33 @@ RunAnalysis(TString wd="")
        @is_mc_analysis = true; ~trueq3d_extra_bins = true; @num_events_to_mix = 4;
        @enable_pair_monitors=false;  $mc_pion_only=true; $pair_delta_eta_min = 0.01;
        $pair_delta_phi_min = 0.03; $pion_1_sigma = 3.0; $pion_1_min_tpc_chi_ndof = 0.33;
-       $pion_1_max_impact_xy=0.02; $pion_1_max_impact_z=0.04; 
+       $pion_1_max_impact_xy=0.02; $pion_1_max_impact_z=0.04;
        $pion_1_rm_neg_lbl = true; )"); )"");
 
-#define RUN_GRID false
+}
 
-#if RUN_GRID
-  setup_grid(mgr, wd);
 
-  mgr->InitAnalysis();
-  mgr->PrintStatus();
+void
+RunLocal(TString wd)
+{
+  TStopwatch timer;
+  timer.Start();
 
-  mgr->StartAnalysis("grid");
-#else
+  auto *mgr = NewAnalysisManagerExec();
+
+  const TString
+    timestamp = wd(wd.Index('-')+1, 14),
+    output_filename = Form("MrcResult-%s.root", timestamp.Data());
+
+  mgr->SetCommonFileName(output_filename);
+
+  gSystem->mkdir(wd);
+  gSystem->CopyFile("ConfigFemtoAnalysis.C", wd + "/ConfigFemtoAnalysis.C");
+  gSystem->CopyFile("RunAnalysis.C", wd + "/RunAnalysis.C");
+  gSystem->cd(wd);
+
+  AddTasks();
+
   mgr->InitAnalysis();
   mgr->PrintStatus();
 
@@ -197,13 +188,86 @@ RunAnalysis(TString wd="")
   }
 
   mgr->StartAnalysis("local", input);
-#endif
-
   timer.Stop();
   timer.Print();
 
-#if !RUN_GRID
   TString outfile = wd + "/" + mgr->GetCommonFileName();
   std::cout << "Output written to " << outfile << "\n";
-#endif
+}
+
+
+void
+RunGrid(TString wd)
+{
+  auto *grid = TGrid::Connect("alien://");
+  if (!grid) {
+    std::cerr << "Could not connect to alien\n";
+    return;
+  }
+
+  auto *mgr = NewAnalysisManagerExec();
+
+  setup_grid(mgr, wd);
+
+  mgr->InitAnalysis();
+  mgr->PrintStatus();
+
+  mgr->StartAnalysis("grid");
+}
+
+
+void
+RunMerge(TString wd)
+{
+  auto *grid = TGrid::Connect("alien://");
+  if (!grid) {
+    std::cerr << "Could not connect to alien\n";
+    return;
+  }
+
+  auto *mgr = NewAnalysisManagerExec();
+
+  setup_grid(mgr, wd);
+
+  mgr->InitAnalysis();
+  mgr->PrintStatus();
+
+  mgr->StartAnalysis("merge");
+}
+
+
+void
+// RunAnalysis(TString wd="")
+RunAnalysis(std::vector<std::string> args)
+{
+  if (args.size() == 0) {
+    usage(std::cerr);
+    return;
+  }
+
+  if (args[0] == "local") {
+    TString wd = args.size() > 1
+               ? TString(args[1])
+               : get_timestamp("local-");
+
+    RunLocal(wd);
+    return;
+  }
+
+  if (args[0] == "grid") {
+
+  }
+
+  if (args[0] == "merge") {
+    if (args.size() == 1) {
+      usage(std::cerr);
+      return;
+    }
+
+    TString wd = args[1];
+    RunMerge(wd);
+    return;
+  }
+
+  // TString output_filename = Form("MrcResult-%s.root", timestamp.Data());
 }
