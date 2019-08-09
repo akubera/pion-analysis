@@ -39,12 +39,8 @@ bool select_particle(TLorentzVector x, TLorentzVector p)
 
 
 void
-RunFemto(TTree &tree)
+RunFemto(TTree &tree, TString output_filename, int event_limit=-1)
 {
-  std::cout << tree.GetName() << "\n";
-
-  // TTreeReader rg(tree);
-  // TTreeReaderValue<float> px(rg, "px");
   TTreeReader tr(&tree);
   TTreeReaderValue<float>
     E(tr, "particle.e"),
@@ -73,18 +69,17 @@ RunFemto(TTree &tree)
   std::mutex queue_mutex;
   std::condition_variable cv;
 
-  const UInt_t N = 8;
-
-  int elimit = -1;
+  const UInt_t thread_count = 14;
 
   std::vector<FemtoRunner> runners;
-  runners.reserve(N);
-  for (UInt_t i=0; i<N; ++i) {
+  runners.reserve(thread_count);
+
+  for (UInt_t i=0; i<thread_count; ++i) {
     runners.emplace_back(event_queue, queue_mutex, cv);
   }
 
   std::vector<std::thread> threads;
-  threads.reserve(N);
+  threads.reserve(thread_count);
   for (auto &runner : runners) {
     threads.emplace_back(runner.spawn());
   }
@@ -93,26 +88,32 @@ RunFemto(TTree &tree)
   std::mt19937 gen(rd());
   std::uniform_real_distribution<> get_rndm_phi(0.0, 2.0 * M_PI);
 
+  std::cout << "Reading events:\n";
+
+  size_t total_events = 0;
   double phi = NAN;
   while (tr.Next()) {
 
     if (prev_eid != *eid) {
-        // event_queue.({});
-        if (!particle_vector.empty()) {
-          std::unique_lock<std::mutex> _lock(queue_mutex);
-          auto ev = std::make_unique<Event>(std::move(particle_vector));
+      if (!particle_vector.empty()) {
+        std::unique_lock<std::mutex> _lock(queue_mutex);
+        auto ev = std::make_unique<Event>(std::move(particle_vector));
 
-          event_queue.emplace_back(std::move(ev));
-          cv.notify_one();
-        }
+        event_queue.emplace_back(std::move(ev));
+        cv.notify_one();
+        total_events++;
+
+        std::cout << "                                    \r"
+                  << total_events << " (unprocessed: " <<  event_queue.size() << ")" << std::flush;
+      }
         // assert(particle_vector.size() == 0);
 
-        if (elimit-- == 0) {
-          break;
-        }
+      if (event_limit-- == 0) {
+        break;
+      }
 
-        phi = get_rndm_phi(gen);
-        prev_eid = *eid;
+      phi = get_rndm_phi(gen);
+      prev_eid = *eid;
     }
 
     TLorentzVector
@@ -130,28 +131,34 @@ RunFemto(TTree &tree)
       particle_vector.emplace_back(vx, vp);
     }
   }
-
-  for (UInt_t i=0; i<N; ++i) {
-    event_queue.emplace_back(nullptr);
-  }
-
   std::cout << "\n";
-  while (event_queue.size()) {
-    std::cout << "\r" << event_queue.size() - N;
+
+  event_queue.emplace_back(nullptr);
+  cv.notify_all();
+
+  std::cout << "Remaining events\n";
+  while (event_queue.size() > 1) {
+    std::cout << "                      \r"
+              << (total_events - (event_queue.size() - 1))
+              << " / " << total_events
+              << std::flush;
     usleep(300);
   }
   std::cout << "\n";
+
+  std::cout << "Joining threads...\n";
 
   for (auto &thread : threads) {
     thread.join();
   }
 
-  for (size_t i=1; i<N; ++i) {
+  std::cout << "Merging histograms...\n";
+  for (size_t i=1; i<thread_count; ++i) {
     runners[0].num->Add(runners[i].num.get());
     runners[0].den->Add(runners[i].den.get());
   }
 
-  TFile ofile("ofile.root", "RECREATE");
+  TFile ofile(output_filename, "RECREATE");
 
   runners[0].num->Write();
   runners[0].den->Write();

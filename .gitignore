@@ -1,6 +1,8 @@
 
 .ipynb_checkpoints/
 .*cache
+*.root
+*.ipynb
 
 /venv*
 .rootbuild/

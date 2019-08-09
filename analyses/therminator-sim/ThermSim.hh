@@ -99,7 +99,6 @@ struct FemtoRunner {
           cv.wait(lk, [&] { return !event_queue.empty(); });
           auto ev_ptr = std::move(event_queue.front());
           if (ev_ptr == nullptr) {
-            event_queue.pop_front();
             break;
           }
           ev = std::move(*ev_ptr);
@@ -110,7 +109,7 @@ struct FemtoRunner {
         FillMixedPairs(ev);
 
         mixing_queue.emplace_back(std::move(ev));
-        if (mixing_queue.size() > 5) {
+        if (mixing_queue.size() > 10) {
           mixing_queue.pop_front();
         }
       }
@@ -144,7 +143,7 @@ struct FemtoRunner {
     {
       auto q = pa.p - pb.p;
       auto kT = 0.5 * (pa.p.Pt() + pb.p.Pt());
-      h.Fill(kT, -q.Mag());
+      h.Fill(-q.Mag(), kT);
     }
 
   std::thread spawn()

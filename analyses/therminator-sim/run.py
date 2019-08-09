@@ -11,8 +11,13 @@ def arg_parser():
     parser = ArgumentParser()
     parser.add_argument("file",
                         nargs='+',
-                        default='event000.root',
                         help='Root files')
+    parser.add_argument("-o", "--output",
+                        help='output file')
+    parser.add_argument("-l", "--limit",
+                        type=int,
+                        default=-1,
+                        help='Limit event count')
     return parser
 
 
@@ -21,7 +26,6 @@ def main(argv=None):
         argv = sys.argv[1:]
 
     args = arg_parser().parse_args(argv)
-    print(args)
 
     from ROOT import TChain, gROOT, gSystem, TH1
 
@@ -37,7 +41,7 @@ def main(argv=None):
     assert load_ok >= 0, load_ok
 
     from ROOT import RunFemto
-    RunFemto(chain)
+    RunFemto(chain, args.output, args.limit)
 
 
 
