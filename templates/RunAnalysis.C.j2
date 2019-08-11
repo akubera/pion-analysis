@@ -1,0 +1,143 @@
+///
+/// \file RunAnalysis.C
+///
+/// Generated From Template
+///
+
+#include <TROOT.h>
+#include <TSystem.h>
+#include <TInterpreter.h>
+#include <TApplication.h>
+#include <TPython.h>
+
+#include <iostream>
+
+void
+SetupGrid(AliAnalysisManager *mgr, TString gridmode)
+{
+  auto *alien = new AliAnalysisAlien();
+  alien->AddDataFile("{{ xmlfile }}");
+  alien->SetRunMode(gridmode);
+  alien->SetGridOutputDir("output");
+  alien->SetGridWorkingDir("{{ workdir }}");
+  alien->SetAliPhysicsVersion("vAN-20190810_ROOT6-1");
+  alien->SetDropToShell(false);
+  alien->SetCheckCopy(false);
+  alien->SetMaxMergeFiles(25);
+  alien->SetMaxMergeStages(10);
+  alien->SetSplitMaxInputFileNumber({{ SPLIT or 15 }});
+  alien->SetMergeViaJDL(true);
+  alien->SetTTL({{ TTL or 12 * 60 * 60 }});
+  alien->AddAdditionalLibrary("{{ ' '.join(upload_files or []) }}");
+  alien->SetRunPrefix("{{ production.prefix or '000'}}");
+
+  mgr->SetGridHandler(alien);
+}
+
+void
+AddTasks(AliAnalysisManager &)
+{
+  gROOT->Macro("$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C");
+  gROOT->Macro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C(kTRUE, kTRUE, kTRUE)");
+  gROOT->Macro("$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C");
+
+  gROOT->LoadMacro("$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C");
+
+  {% for name, params in analysis_params %}
+
+  gROOT->ProcessLine(
+    R"""(AddNuTaskPionPionRoot6("{{name}}",
+                                "",
+                                R"( {{params}} )" ); )""");
+  {% endfor %}
+
+}
+
+AliAnalysisManager*
+CreateAnalysisManager()
+{
+  auto *mgr = new AliAnalysisManager();
+  mgr->SetCommonFileName("{{output_filename}}");
+  AddTasks(*mgr);
+  return mgr;
+}
+
+void
+StartGridRun()
+{
+  auto *mgr = CreateAnalysisManager();
+  SetupGrid(mgr, "full");
+
+  mgr->InitAnalysis();
+  mgr->PrintStatus();
+  mgr->StartAnalysis("grid");
+}
+
+void
+StartGridMerge()
+{
+  auto *mgr = CreateAnalysisManager();
+  SetupGrid(mgr, "merge");
+
+  mgr->InitAnalysis();
+  mgr->PrintStatus();
+  mgr->StartAnalysis("grid");
+}
+
+void
+StartGridKill()
+{
+  std::ifstream mjobfile("masterjob");
+  ULong64_t masterjob = 0;
+  mjobfile >> masterjob;
+}
+
+void usage(std::ostream &out)
+{
+   out <<    "usage: RunAnalysis.C <mode> <options>\n"
+       << "\n"
+       << "\n    mode:"
+       << "\n       grid: Start grid analysis"
+       << "\n       merge: Start merge"
+       << "\n       reduce: Delete merged sources and move files"
+       << "\n       kill: Kill DONE jobs"
+       << "\n";
+}
+
+
+void
+// RunAnalysis(TString wd="")
+RunAnalysis(std::vector<std::string> args)
+{
+  if (args.size() == 0) {
+    usage(std::cerr);
+    return;
+  }
+
+  if (args[0] == "grid") {
+    StartGridRun();
+  }
+
+  if (args[0] == "merge") {
+    StartGridMerge();
+  }
+
+  if (args[0] == "reduce") {
+
+  }
+
+}
+
+void
+RunAnalysis()
+{
+  char **argv = gApplication->Argv();
+  const int argc = gApplication->Argc();
+  std::vector<std::string> all_args(argv, argv+argc);
+
+  std::string macro_name(gInterpreter->GetCurrentMacroName());
+  std::string macro_path(macro_name.begin() + macro_name.find("/./") + 3, macro_name.end());
+
+  std::vector<std::string> args(std::find(all_args.begin(), all_args.end(), macro_path) + 1, all_args.end());
+  RunAnalysis(args);
+}
