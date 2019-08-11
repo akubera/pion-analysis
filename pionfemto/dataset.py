@@ -2,6 +2,7 @@
 from dataclasses import dataclass as _dataclass, asdict as _asdict
 from pathlib import Path as _Path
 from hashlib import md5 as _md5
+import subprocess as sp
 
 
 @_dataclass
@@ -20,10 +21,10 @@ class Production:
         filename = self.rootfile
         return path, filename
 
-    def xmlfilenames_for_runs(self, runs, parent=None):
-        return [self.xmlfilename_for_run(run, parent) for run in runs]
+    def xmlfilenames_for_runs(self, runs, parent=None, zip=False):
+        yield from (self.xmlfilename_for_run(run, parent) for run in runs)
 
-    def xmlfilename_for_run(self, run, parent=None):
+    def xmlfilename_for_run(self, run, parent=None, zip=False):
         """
         Return unique filename for requested run - no check for valid
         path is performed
@@ -35,45 +36,45 @@ class Production:
         key = f"{self.data_dir}/{self.prefix}{run}/{self.pattern}"
         md5.update(key.encode())
 
-        xmlfilename = '%d-%s.xml' % (run, md5.hexdigest())
+        xmlfilename = _Path('%d-%s.xml' % (run, md5.hexdigest()))
+        if zip:
+            xmlfilename = xmlfilename.with_suffix('.xml.gz')
 
         if parent is not None:
             xmlfilename = _Path(parent) / xmlfilename
         return _Path(xmlfilename)
 
-    def fetch_xml_of_run(self, run, dest=None, sync=True):
+    def fetch_xml_of_run(self, run, sync=True) -> bytes:
         """
         """
+        from sys import stderr
+        import subprocess as sp
+        from xml.etree import ElementTree
 
         query = self.query_for_run(run)
 
-        def _process_xml(cmd, success, exit_code):
-            xml_data = cmd.stdout.strip()
-            return xml_data
-
-        import sh
-
-        is_async = not sync
-
         collection_name = 'collection-%s' % run
+        find_proc = sp.Popen(['alien_find', '-x', collection_name, *query],
+                             stdout=sp.PIPE, stderr=sp.PIPE)
 
-        find_proc = sh.alien_find("-x", collection_name, *query,
-                                  _done=_process_xml,
-                                  _bg=is_async)
-        if is_async:
-            return find_proc
+        xml_out, xml_err = find_proc.communicate()
 
-        return find_proc.wait()
+        # "validate" the xml
+        try:
+            ElementTree.fromstring(xml_out)
+        except ElementTree.ParseError:
+            print(xml_out.decode().strip(), file=stderr)
+            exit(1)
 
-    def xml_of_run(self, run, xmldir=None, sync=True, zip=False):
+        return xml_out.strip()
+
+    def xml_of_run(self, run, xmldir=None, zip=False, return_path=False) -> str:
         """
         Return xml text of query for datafiles in run
         """
         import gzip
 
-        if xmldir is None:
-            xmldir = 'xmls'
-        xmldir = _Path(xmldir)
+        xmldir = _Path(xmldir or 'xmls')
         xmldir.mkdir(exist_ok=True, parents=True)
 
         # check cache locations
@@ -83,18 +84,19 @@ class Production:
 
         zxml_path = xml_path.with_suffix(".xml.gz")
         if zxml_path.exists():
-            return gzip.decompress(zxml_path.read_bytes())
+            return gzip.decompress(zxml_path.read_bytes()).decode()
 
         # not in cache - fetch from server
-        asyncjob = self.fetch_xml_of_run(run, xmldir, True)
-        cmd = asyncjob.wait()
-        xml_data = cmd.stdout.strip()
+        xml_data = self.fetch_xml_of_run(run)
 
         if zip:
              with gzip.open(zxml_path, "wb") as f:
                  f.write(xml_data)
         else:
             xml_path.write_bytes(xml_data)
+
+        if return_path:
+            return zxml_path if zip else xml_path
 
         return xml_data.decode()
 
