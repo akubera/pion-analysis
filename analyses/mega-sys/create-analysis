@@ -46,7 +46,7 @@ def main(argv=None):
     # return
 
     args = arg_parser().parse_args(argv)
-    tag = args.tag or datetime.now().strftime("%y%j%H%M%S")
+    tag = args.tag or datetime.now().strftime("%y%m%d%H%M%S")
     config = yaml.safe_load(args.config)
 
     split_runlists = ChunkedDataset(config['dataset'], pieces=3)
@@ -54,33 +54,86 @@ def main(argv=None):
     from ROOT import TGrid
     grid = TGrid.Connect("alien://")
 
-    print("Downloading run xmls")
-    split_runlists.download_all_xmls(xml_cache_dir, grid=grid)
+    # print("Downloading run xmls")
+    # split_runlists.download_all_xmls(xml_cache_dir, grid=grid)
 
-    print("Creating runlist xmls")
-    split_runlists.create_runlist_xmls(xml_cache_dir)
-
-    split_runlists.upload_xmls(grid=grid, xml_cache_dir=xml_cache_dir)
-    return
+    # print("Creating runlist xmls")
+    # split_runlists.create_runlist_xmls(xml_cache_dir)
+    # split_runlists.upload_xmls(grid=grid, xml_cache_dir=xml_cache_dir)
 
     jobtag = 'job-' + tag
     results_path = Path("gridresults") / jobtag
-    # results_path.mkdir(parents=True)
+    results_path.mkdir(parents=True)
 
-    for listname, runs in config['runlists'].items():
-        for centrality in map(tuple, config['centralities']):
-            cent_key = '%02d_%02d' % centrality
+    from jinja2 import Template
+    template_path = Path("../../templates/RunAnalysis.C.j2")
+    template = Template(template_path.read_text())
+    from itertools import product
 
-            subanalysis_path = results_path / f'{listname}-{cent_key}'
-            print(subanalysis_path)
+    combos = product(split_runlists, map(tuple, config['centralities']))
+    for idx, ((listname, runs), centrality) in enumerate(combos):
+        xml_inputfile = f'/alice/cern.ch/user/a/akubera/xml/{listname}.xml'
+        cent_key = '%02d_%02d' % centrality
+        cent_range = '%g:%g' % centrality
+
+        keydict = split_runlists.key_to_dict(listname)
+
+        # uid = f"{keydict['hash']}-{keydict['index']}-{keydict['name']}"
+        results_filename = f"AnalysisResults-{tag}-{keydict['name']}.root"
+        subanalysis_path = results_path / f"{keydict['name']}-{keydict['index']}-{cent_key}"
+
+        each_sys = [
+            ("sys_pthi_a", "$pion_1_pt = {0.20,2.0};"),
+            ("sys_pthi_b", "$pion_1_pt = {0.20,1.5};"),
+            ("sys_pthi_c", "$pion_1_pt = {0.20,1.0};"),
+            ("sys_ptlo_a", "$pion_1_pt = {0.15,2.0};"),
+            ("sys_ptlo_b", "$pion_1_pt = {0.20,2.0};"),
+            ("sys_ptlo_c", "$pion_1_pt = {0.25,2.0};"),
+            ("sys_global_a", "~eventreader_dca_globaltrack=0;"
+                             "~pion_1_max_impact_xy=1.3;"
+                             "~pion_1_max_impact_z=1.3;"),
+            ("sys_global_b", "~eventreader_dca_globaltrack=0;"
+                             "~pion_1_max_impact_xy=2.0;"
+                             "~pion_1_max_impact_z=2.0;"),
+            ("sys_global_c", "~eventreader_dca_globaltrack=0;"
+                             "~pion_1_max_impact_xy=2.7;"
+                             "~pion_1_max_impact_z=2.7;"),
+        ]
+
+        kt_ranges = '0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0'
+        analysis_params = [
+            (f"Pion_{cent_key}_{syskey}",
+             f"""{{ {cent_range} }}; ({kt_ranges});
+              ~do_kt_qinv_cf=true; ~do_kt_pqq3d_cf=true; ~do_kt_ylm_cf=true;
+              ~do_sharequality_cf=true;  ~do_avg_sep_cf=true; ~do_detadphistar_cf=true;
+              ~q3d_bin_count=51; ~q3d_maxq = 0.153; @enable_pair_monitors=false;
+              @num_events_to_mix = 3;
+              $pion_1_min_tpc_chi_ndof = 0.33;
+              $pion_1_max_tpc_chi_ndof = 1.8;
+              $pion_1_max_its_chi_ndof = 1.8;
+              {params}
+              """)
+            for syskey, params in each_sys]
+
+        # runanalysis_path.write_text(template.render(xml_))
+        template_data = {
+            'xmlfile':xml_inputfile,
+            'output_filename': results_filename,
+            'production': split_runlists.production,
+            'analysis_params': analysis_params,
+            'workdir': f"{jobtag}-{idx:02d}",
+        }
+
+        analysis_macro_txt = template.render(**template_data)
+        runanalysis_path: Path = subanalysis_path / 'RunAnalysis.C'
+
+        subanalysis_path.mkdir()
+        runanalysis_path.write_text(analysis_macro_txt)
 
 
-            # results_path / .mkdir(resul)
-
-        results_filename = 'AnalysisResults-{tag}-{listname}.root'
-    #     print(listname)
-    #     pprint(runs)
-
+            #     print(listname)
+            #     pprint(runs)
+    return
 
 
 class ChunkedDataset:
@@ -151,12 +204,11 @@ class ChunkedDataset:
 
     @staticmethod
     def key_to_dict(key):
-        h, p, n, i, m = key.split('-')
+        h, p, n, i = key.split('-')
         return {'hash': h,
                 'production': p,
                 'name': n,
-                'i': int(i),
-                'max': int(m)}
+                'index': i}
 
         # yield from self.runchunks.items()
 
