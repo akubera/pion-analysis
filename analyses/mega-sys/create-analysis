@@ -1,0 +1,284 @@
+#!/usr/bin/env python
+#
+# create-analysis
+#
+
+from typing import List, Dict
+
+import sys
+from pathlib import Path
+from pprint import pprint
+from datetime import datetime
+import subprocess as sp
+
+import yaml
+from tqdm import tqdm
+
+
+def arg_parser():
+    from argparse import ArgumentParser, FileType
+    parser = ArgumentParser()
+    parser.add_argument("--tag",
+                        nargs='?',
+                        default=None,
+                        help='Unique analysis identifier')
+    parser.add_argument("config",
+                        nargs='?',
+                        type=FileType('r'),
+                        default='config.yaml',
+                        help='Configuration file')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+
+    sys.path.insert(2, '../..')
+
+    xml_cache_dir = Path(".cache-xml")
+    xml_cache_dir.mkdir(exist_ok=True)
+
+    # from jinja2 import Template
+    # run_analysis_template_path = Path('../../templates/RunAnalysis.C.j2')
+    # run_analysis_template = Template(run_analysis_template_path.read_text())
+    # print(run_analysis_template.render(xmlfile='foo.xml'))
+    # return
+
+    args = arg_parser().parse_args(argv)
+    tag = args.tag or datetime.now().strftime("%y%j%H%M%S")
+    config = yaml.safe_load(args.config)
+
+    split_runlists = ChunkedDataset(config['dataset'], pieces=3)
+
+    from ROOT import TGrid
+    grid = TGrid.Connect("alien://")
+
+    print("Downloading run xmls")
+    split_runlists.download_all_xmls(xml_cache_dir, grid=grid)
+
+    print("Creating runlist xmls")
+    split_runlists.create_runlist_xmls(xml_cache_dir)
+
+    split_runlists.upload_xmls(grid=grid, xml_cache_dir=xml_cache_dir)
+    return
+
+    jobtag = 'job-' + tag
+    results_path = Path("gridresults") / jobtag
+    # results_path.mkdir(parents=True)
+
+    for listname, runs in config['runlists'].items():
+        for centrality in map(tuple, config['centralities']):
+            cent_key = '%02d_%02d' % centrality
+
+            subanalysis_path = results_path / f'{listname}-{cent_key}'
+            print(subanalysis_path)
+
+
+            # results_path / .mkdir(resul)
+
+        results_filename = 'AnalysisResults-{tag}-{listname}.root'
+    #     print(listname)
+    #     pprint(runs)
+
+
+
+class ChunkedDataset:
+
+    def __init__(self, dataset_cfg: dict, pieces=2, chunksize=None, seed=42):
+        import random
+        import json
+        from hashlib import md5
+        from math import ceil
+
+        state = random.getstate()
+        random.seed(seed)
+
+        runlists = dataset_cfg['runlists']
+        chunksize = chunksize or dataset_cfg.get('chunksize')
+
+        self.production = dataset_cfg['production']
+
+        self.runchunks: Dict[str, List[int]] = {}
+        for listname, runs in sorted(runlists.items()):
+            runs = set(runs)
+            k = chunksize if chunksize is not None else ceil(len(runs) / pieces)
+
+            clist = self.runchunks[listname] = []
+            while len(runs) > k:
+                subruns = random.sample(runs, k=k)
+                runs -= set(subruns)
+                clist.append(sorted(subruns))
+            clist.append(sorted(runs))
+
+        random.setstate(state)
+        hasher = md5()
+        hasher.update(json.dumps(self.runchunks, sort_keys=True).encode())
+        self.hash = hasher.hexdigest()
+
+    @property
+    def production(self):
+        return self._production
+
+    @production.setter
+    def production(self, val):
+        from pionfemto.dataset import Production
+        if isinstance(val, str):
+            vals = {
+                'LHC15o_AOD194': {
+                    'name': 'LHC15o_AOD194',
+                    'prefix': '000',
+                    'data_dir': "/alice/data/2015/LHC15o",
+                    'pattern': "/pass1/AOD194/*",
+                    'rootfile': "AliAOD.root",
+                    'archive': "aod_archive.zip",
+                    'is_mc': False },
+            }
+            try:
+                prod_info = vals[val]
+            except KeyError as e:
+                raise ValueError(f"Unknown production {val!r}") from e
+        else:
+            prod_info = val
+
+        self._production = Production(**prod_info)
+        return self._production
+
+    def __iter__(self):
+        for runname, runlists in self.runchunks.items():
+            for i, runlist in enumerate(runlists, 1):
+                yield f'{self.hash}-{self.production.name}-{runname}-{i}_{len(runlists)}', runlist
+
+    @staticmethod
+    def key_to_dict(key):
+        h, p, n, i, m = key.split('-')
+        return {'hash': h,
+                'production': p,
+                'name': n,
+                'i': int(i),
+                'max': int(m)}
+
+        # yield from self.runchunks.items()
+
+    def download_all_xmls(self, xml_cache_dir='.cache-xml', grid=None):
+
+        xml_cache_dir = Path(xml_cache_dir)
+
+        # flatten
+        all_runs = [run for runlists in self.runchunks.values()
+                        for runlist in runlists
+                        for run in runlist]
+
+        filenames = self.production.xmlfilenames_for_runs(all_runs, parent=xml_cache_dir)
+
+        for filename, run in tqdm(zip(filenames, all_runs), total=len(all_runs)):
+            if Path(filename).with_suffix(".xml.gz").exists():
+                continue
+
+            self.production.xml_of_run(run, xmldir=xml_cache_dir, zip=True)
+
+        # for xml_path in self.production.xmlfilenames_for_runs(all_runs, xml_cache_dir):
+        #     print(xml_path)
+
+    def _build_combined_xml(self, runs, dest_path, grid_path=None, pbar=True):
+        from tempfile import NamedTemporaryFile
+        from ROOT import TAlienCollection
+
+        xmlfiles = []
+        runloop = tqdm(runs) if pbar else runs
+
+        for run in runs:
+            xml = self.production.xml_of_run(run, dest_path.parent, zip=True)
+            tmpfile = NamedTemporaryFile(suffix='.xml')
+            tmpfile.write(xml.encode())
+            xmlfiles.append(tmpfile)
+
+        # filenames = production.xmlfilenames_for_runs(subruns, 'xmls')
+        collection = TAlienCollection(xmlfiles[0].name, 100000)
+        for tfile in xmlfiles[1:]:
+            c = TAlienCollection.Open(tfile.name)
+            collection.AddFast(c)
+        collection_name = 'collection-' + dest_path.stem
+
+        local_url = "file://%s" % dest_path
+        comment = 'runlist:%r' % runs
+        collection.ExportXML(local_url, False, False, collection_name, comment)
+
+        if grid_path:
+            grid_url = "alien://%s" % grid_path
+            collection.ExportXML(grid_url, False, False, collection_name, comment)
+
+    def create_runlist_xmls(self, xml_cache_dir='.cache-xml'):
+        """
+        Create merged runlist XML
+        """
+        for keyname, runlists in tqdm(list(self)):
+            xml_file = (xml_cache_dir / keyname).with_suffix('.xml')
+            if xml_file.exists():
+                continue
+
+            self._build_combined_xml(runlists, xml_file)
+
+    @property
+    def runlist_xml_files(self) -> List[str]:
+        return [keyname + ".xml" for keyname, _ in self]
+
+    def upload_xmls(self, grid, xml_cache_dir='.cache-xml'):
+        """
+        Upload all xml files in this chunked dataset
+        """
+        from ROOT import TFile
+
+        xml_cache_dir = Path(xml_cache_dir)
+
+        gridhome = grid.GetHomeDirectory()
+        if not gridhome:
+            raise RuntimeError("Could not load grid home directory")
+
+        gridhomepath = Path(gridhome)
+        grid_xml_path = gridhomepath / 'xml'
+
+        xml_file_query = grid.Ls(str(grid_xml_path) + "/*.xml")
+        grid_xml_files = {str(m.GetValue("name")) for m in xml_file_query}
+
+        missing_xml_files = set(self.runlist_xml_files) - grid_xml_files
+
+        if not missing_xml_files:
+            print("All XML files present")
+            return
+        else:
+            print("Uploading %d runlist files" % len(missing_xml_files))
+
+        for keyname, runlists in self:
+            xml_keyname = keyname + '.xml'
+
+            if xml_keyname not in missing_xml_files:
+                continue
+
+            grid_xml_dir = grid_xml_path
+            grid_xml_path = grid_xml_path / xml_keyname
+            local_xml_path = xml_cache_dir / xml_keyname
+
+            if not local_xml_path.exists():
+                self._build_combined_xml(runlists, local_xml_path)
+                assert local_xml_path.exists()
+
+            cp_src = str(local_xml_path.resolve())
+            cp_dst = 'alien://%s/' % grid_xml_dir
+
+            while True:
+                cp_proc = sp.Popen(['alien_cp', cp_src, cp_dst], stdout=sp.PIPE, stderr=sp.PIPE)
+                cp_out, cp_err = cp_proc.communicate()
+                if cp_proc.returncode == 0:
+                    sleep(5)
+                    break
+                else:
+                    print("Failed copying file", local_xml_path, file=sys.stderr)
+                    print(" alien_cp returned status %d" % cp_proc.returncode, file=sys.stderr)
+                    exit(1)
+
+        return
+
+
+if __name__ == "__main__":
+    exit(main())
