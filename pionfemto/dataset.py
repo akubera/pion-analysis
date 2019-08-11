@@ -6,6 +6,7 @@ from hashlib import md5 as _md5
 
 @_dataclass
 class Production:
+    name: str
     prefix: str
     data_dir: str
     pattern: str
