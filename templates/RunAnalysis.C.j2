@@ -25,7 +25,7 @@ SetupGrid(AliAnalysisManager *mgr, TString gridmode)
   alien->SetCheckCopy(false);
   alien->SetMaxMergeFiles(25);
   alien->SetMaxMergeStages(10);
-  alien->SetSplitMaxInputFileNumber({{ SPLIT or 15 }});
+  alien->SetSplitMaxInputFileNumber({{ SPLIT or 24 }});
   alien->SetMergeViaJDL(true);
   alien->SetTTL({{ TTL or 12 * 60 * 60 }});
   alien->AddAdditionalLibrary("{{ ' '.join(upload_files or []) }}");
@@ -76,12 +76,117 @@ StartGridRun()
 void
 StartGridMerge()
 {
+  auto *tfile = TFile::Open("analysis.root");
+  auto *mgr = static_cast<AliAnalysisManager*>(tfile->Get("mgr"));
+  /*
   auto *mgr = CreateAnalysisManager();
-  SetupGrid(mgr, "merge");
+  */
+  SetupGrid(mgr, "terminate");
 
   mgr->InitAnalysis();
   mgr->PrintStatus();
   mgr->StartAnalysis("grid");
+}
+
+void
+StartGridReduce()
+{
+  int Stage_i = -1;
+  for (int i=9; i>0; --i) {
+    std::ifstream stage_file(Form("Stage_%d.xml", i));
+
+    if (stage_file.good()) {
+      char ans[100] = {'\0'};
+      std::cout << "\n  Are you sure Stage " << i << " has finished? ";
+      std::cin >> ans;
+      std::string answer(ans);
+
+      if (answer != "yes" && answer != "y") {
+        std::cout << "  Aborting.\n\n";
+        return;
+      }
+
+      Stage_i = i;
+
+      break;
+    }
+  }
+  std::cout << "Reducing merging Stage_" << Stage_i << ".xml\n";
+
+  TDOMParser parser;
+  parser.SetValidate(false);
+  parser.ParseFile(Form("Stage_%d.xml", Stage_i));
+
+  TXMLNode *alien = parser.GetXMLDocument()->GetRootNode();
+  TXMLNode *collection = alien->GetChildren()->GetNextNode();
+  if (collection->GetNodeName() != std::string("collection")) {
+    std::cerr << "Unexpected xml file structure: "
+                 "Could not find 'collection'\n";
+    return;
+  }
+
+  TGrid *grid = TGrid::Connect("alien://");
+  std::string
+    grid_output_dir(Form("%s{{ workdir }}/output", grid->GetHomeDirectory())),
+    grid_merge_dir(grid_output_dir + Form("/Stage_%d", Stage_i)),
+    grid_source_dir(Stage_i == 1 ? grid_output_dir : grid_output_dir + Form("/Stage_%d", Stage_i-1));
+
+  TGridResult *ls = grid->Ls(grid_source_dir.c_str());
+  std::unordered_set<std::string> current_output_files;
+  current_output_files.reserve(ls->GetEntries());
+
+  for (int i=0; i<ls->GetEntries(); ++i) {
+    TString filename(ls->GetFileName(i));
+    TString filepath(ls->GetFileNamePath(i));
+    if (filename.Atoi()) {
+      current_output_files.emplace(filepath);
+    }
+  }
+
+  if (current_output_files.empty()) {
+    std::cout << "Nothing to do\n";
+    return;
+  }
+
+  std::cout << "Found " << current_output_files.size() << " output files\n";
+  std::cout << "Removing files which have been merged: \n";
+  TXMLNode *event = collection->GetChildren();
+  while ((event = event->GetNextNode())) {
+    if (event->GetNodeName() == std::string("event")) {
+      TXMLNode *filenode = event->GetChildren()->GetNextNode();
+      TXMLAttr *lfn = (TXMLAttr *)filenode->GetAttributes()->FindObject("lfn");
+
+      std::string filepath(lfn->GetValue());
+      std::string filedir(filepath, 0, filepath.find_last_of('/'));
+
+      auto loc = current_output_files.find(filedir);
+      if (loc == current_output_files.end()) {
+        continue;
+      }
+      break;
+      std::cout << "REMOVING" << filedir << "\n";
+      // grid->Rmdir(filedir.c_str());
+      current_output_files.erase(loc);
+    }
+  }
+
+  std::cout << "Moving finished files into merge dir:\n";
+
+  for (auto filepath : current_output_files) {
+    std::string dirname(filepath, filepath.find_last_of('/')+1);
+    std::string dest(grid_merge_dir + "/X" + dirname);
+    std::cout << "Moving " << filepath << "\n";
+    std::string mv_cmd = Form("mv %s/* %s/", filepath.c_str(), dest.c_str());
+
+    grid->Mkdir(dest.c_str());
+    grid->Command(mv_cmd.c_str(), kFALSE);
+    grid->Rmdir(filepath.c_str());
+  }
+
+  // std::cout << "->: " << cnode->GetNextNode()->GetNodeName() << "\n";
+  // std::cout << "  : " << cnode->GetContent() << "\n";
+
+  // xml_parser(OnStartElement(const char *, const TList *))
 }
 
 void
@@ -106,7 +211,6 @@ void usage(std::ostream &out)
 
 
 void
-// RunAnalysis(TString wd="")
 RunAnalysis(std::vector<std::string> args)
 {
   if (args.size() == 0) {
