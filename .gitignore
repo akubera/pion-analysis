@@ -1,6 +1,14 @@
 
 .ipynb_checkpoints/
+*.ipynb
+
+*.root
 .*cache
+*.zip
+*.bz2
+
+__pycache__/
+*.py[cod]
 
 /venv*
 .rootbuild/
