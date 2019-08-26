@@ -4,5 +4,9 @@
 *.root
 *.ipynb
 
+*.[oad]
+*.so
+*.pcm
+
 /venv*
 .rootbuild/
