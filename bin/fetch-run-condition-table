@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+#
+# fetch-run-condition-table
+#
+
+
+
+def main(argv=None):
+    table = load_table()
+
+
+def load_table():
+    from bs4 import BeautifulSoup
+    html = load_html()
+    soup = BeautifulSoup(html, features="html.parser")
+    # print(soup.prettify())
+    tables = soup.find_all("table", attrs={"class": "table_content"})
+    table_content = tables[0]
+    table = table_content.find_all("table", attrs={"class": "sortable"})
+    table = tables[0]
+    # print("found", len(tables), "tables")
+
+    thead = table.find("thead")
+    header = [td.input['name'] for td in thead.find_all('tr')[1].find_all('td')]
+    print(header)
+    tbody = table.find("tbody")
+
+    values = []
+    for tr in tbody.find_all("tr"):
+
+        # print([td.input['name'] for td in tbody.find_all('tr')[1].find_all('td')])
+        row = [td.text for td in tr.find_all('td')]
+        values.append(row[:1] + row[2:])
+
+    import pandas as pd
+    import locale
+    from locale import atof
+
+    locale.setlocale(locale.LC_NUMERIC, 'en_US.UTF-8')
+
+    df = pd.DataFrame(values, columns=header)
+    float_keys = ['energy', 'mu', 'rate']
+    df[float_keys] = df[float_keys].applymap(lambda e: locale.atof(e) if e else None)
+
+    int_keys = ['interacting_bunches', 'noninteracting_bunches_beam_1', 'field', 'det_aco', 'det_ad0', 'det_emc', 'det_fmd', 'det_hlt', 'det_hmp', 'det_mch', 'det_mtr', 'det_phs', 'det_pmd', 'det_spd', 'det_sdd', 'det_ssd', 'det_tof', 'det_tpc', 'det_trd', 'det_t00', 'det_v00', 'det_zdc', 'hlt_mode',]
+    df[int_keys] = df[int_keys].applymap(lambda e: locale.atoi(e) if e and e != 'x' else 0)
+    return table
+
+
+def load_html():
+    from pathlib import Path
+    path = Path(".run-condition-table.html")
+
+    if path.exists():
+        return path.read_text()
+
+    html = fetch_html()
+    path.write_text(html)
+    return html
+
+
+def fetch_html() -> str:
+    import alimaster
+    from importlib import resources
+    from http.client import HTTPSConnection
+
+    import ssl
+    sslctx = ssl.create_default_context()
+
+    with resources.path("alimaster.data", 'CernGridCA.pem') as ca_path:
+        sslctx.load_verify_locations(str(ca_path))
+        sslctx.load_cert_chain('/home/akubera/.globus/usercert.pem',
+                               '/home/akubera/.globus/userkey.pem')
+
+        conn = HTTPSConnection(
+            host='alimonitor.cern.ch',
+            context=sslctx,
+        )
+
+        partition = 'LHC15o'
+        data_pass = '1'
+
+        query = ("/configuration/index.jsp?"
+                 f"partition={partition}&"
+                 f"pass={data_pass}&"
+                 "field=&"
+                 "raw_run=&"
+                 "filling_scheme=&"
+                 "filling_config=&"
+                 "fillno=&energy=&"
+                 "intensity_per_bunch=&"
+                 "mu=&interacting_bunches=&"
+                 "noninteracting_bunches_beam_1=&"
+                 "noninteracting_bunches_beam_2=&"
+                 "interaction_trigger=&rate=&"
+                 "beam_empty_trigger=&empty_empty_trigger=&"
+                 "muon_trigger=&high_multiplicity_trigger=&"
+                 "emcal_trigger=&calibration_trigger=&quality=&"
+                 "muon_quality=&physics_selection_status=&comment=&"
+                 "det_aco=&det_ad0=&det_emc=&det_fmd=&det_hlt=&"
+                 "det_hmp=&det_mch=&det_mtr=&det_phs=&det_pmd=&det_spd=&"
+                 "det_sdd=&det_ssd=&det_tof=&det_tpc=&det_trd=&det_t00=&"
+                 "det_v00=&det_zdc=&hlt_mode=&changedon=")
+
+        conn.request('GET', query)
+
+        rsp = conn.getresponse()
+        return rsp.read().decode()
+
+
+if __name__ == '__main__':
+    exit(main())
