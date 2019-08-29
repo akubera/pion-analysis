@@ -103,8 +103,8 @@ RunFemto(TTree &tree, TString output_filename, int event_limit=-1)
         cv.notify_one();
         total_events++;
 
-        std::cout << "                                    \r"
-                  << total_events << " (unprocessed: " <<  event_queue.size() << ")" << std::flush;
+        // std::cout << "                                    \r"
+        //           << total_events << " (unprocessed: " <<  event_queue.size() << ")" << std::flush;
       }
         // assert(particle_vector.size() == 0);
 
@@ -136,23 +136,23 @@ RunFemto(TTree &tree, TString output_filename, int event_limit=-1)
   event_queue.emplace_back(nullptr);
   cv.notify_all();
 
-  std::cout << "Remaining events\n";
+  // std::cout << "Remaining events\n";
   while (event_queue.size() > 1) {
-    std::cout << "                      \r"
-              << (total_events - (event_queue.size() - 1))
-              << " / " << total_events
-              << std::flush;
+    // std::cout << "                      \r"
+    //           << (total_events - (event_queue.size() - 1))
+    //           << " / " << total_events
+    //           << std::flush;
     usleep(300);
   }
-  std::cout << "\n";
+  // std::cout << "\n";
 
-  std::cout << "Joining threads...\n";
+  // std::cout << "Joining threads...\n";
 
   for (auto &thread : threads) {
     thread.join();
   }
 
-  std::cout << "Merging histograms...\n";
+  // std::cout << "Merging histograms...\n";
   for (size_t i=1; i<thread_count; ++i) {
     runners[0].num->Add(runners[i].num.get());
     runners[0].den->Add(runners[i].den.get());
