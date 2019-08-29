@@ -42,8 +42,9 @@ def main(argv=None):
 
     env = os.environ.copy()
 
-    wh = sp.Popen(['/usr/bin/which', 'gbbox'])
-    wh.wait()
+    wh = sp.Popen(['/usr/bin/which', 'gbbox'], stdout=sp.PIPE)
+    gbbox_exe, *_ = wh.communicate()
+
     module = 'AliROOT/latest'
     if wh.returncode != 0:
         print("Not in python environment... loading %s" % module, end=' ')
@@ -53,8 +54,6 @@ def main(argv=None):
         cmd = run(['modulecmd', 'python', 'load', module])
         cmd_out, *_ = cmd.communicate()
         exec(cmd_out)
-        print("OK")
-        # return 0
 
     cmd = run(['gbbox', 'ps', '-As', f'-id={args.masterjob}'])
     cmd_out, *_ = cmd.communicate()
@@ -64,13 +63,18 @@ def main(argv=None):
         print(pid)
         cmd = run(['alien_ps', '-jdl', pid])
         cmd_out, *_ = cmd.communicate()
-        print(cmd_out)
 
         m = re.search(r"InputData\s=\s+{([^}]+)}", cmd_out, re.M)
-        print(m)
-        print(m.group(1))
 
-        break
+        input_dirs = (Path(a.group(1)).parent
+                      for a in re.finditer("LF:([^,]+)", m.group(1)))
+
+        for input_dir in input_dirs:
+            rmdir_proc = run(['alien_rmdir', input_dir])
+            rmdir_proc.wait()
+
+        kill_proc = run(['alien_kill', pid])
+        kill_proc.wait()
 
     return 0
 
@@ -130,7 +134,7 @@ class JobList:
                         (?P<splitjob>-)?
                         (?P<pid>[0-9]+)
                         \s+
-                        (?P<status>[A-Z]{1,2})
+                        (?P<status>[A-Z_]+)
                         \s+
                         (?P<runtime>[0-9:]+)?
                         \s+
@@ -150,7 +154,7 @@ class JobList:
     def done(self):
         return [j['pid']
                 for j in self.jobs
-                if j['status'] in ('D', 'DW')]
+                if j['status'] in ('D', 'D_WARN')]
 
     @classmethod
     def FromCommand(cls, args):
