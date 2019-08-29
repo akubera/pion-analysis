@@ -59,17 +59,17 @@ def main(argv=None):
     cmd_out, *_ = cmd.communicate()
     jl = JobList(cmd_out)
 
-    for pid in jl.done():
+    for pid in tqdm(jl.done()):
         print(pid)
         cmd = run(['alien_ps', '-jdl', pid])
         cmd_out, *_ = cmd.communicate()
 
         m = re.search(r"InputData\s=\s+{([^}]+)}", cmd_out, re.M)
 
-        input_dirs = (Path(a.group(1)).parent
-                      for a in re.finditer("LF:([^,]+)", m.group(1)))
+        input_dirs = [Path(a.group(1)).parent
+                      for a in re.finditer("LF:([^,]+)", m.group(1))]
 
-        for input_dir in input_dirs:
+        for input_dir in tqdm(input_dirs):
             rmdir_proc = run(['alien_rmdir', input_dir])
             rmdir_proc.wait()
 
