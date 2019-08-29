@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+#
+# bin/dataset
+#
+
+import os
+import sys
+import subprocess as sp
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from xml.etree import ElementTree
+
+from tqdm import tqdm
+
+
+def arg_parser():
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+
+    subparser = parser.add_subparsers(title=None, metavar='<command>')
+
+    helper = subparser.add_parser('help', help='Print command usage', )
+    helper.add_argument('command', nargs='?')
+    helper.set_defaults(cmd=main_help)
+
+    build = subparser.add_parser('build', help='Build a new dataset', )
+    build.add_argument('name',
+                       help='dataset name')
+    build.set_defaults(cmd=main_build)
+
+    ls = subparser.add_parser('ls', help='Build a new dataset', )
+    ls.set_defaults(cmd=main_ls)
+
+    # parser.add_argument("cmd",
+    #                     metavar='<command>',
+    #                     choices='ls')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+    return args.cmd(args)
+
+
+def main_ls(args):
+    print(args)
+
+
+def main_build(args):
+    print("BULIDING", args.name)
+    import sys
+    sys.path.insert(-1, '/home/akubera/Physics/pion-analysis')
+    import yaml
+    from alimaster.datasets import Dataset
+    from alimaster.datasets import Production
+    # from pionfemto.dataset import Production
+
+    d = yaml.safe_load(Path("datasets.yaml").read_text())
+    try:
+        dataset = d[args.name]
+    except KeyError:
+        print(f"Unknown dataset {args.name!r}", file=sys.stderr)
+        return 1
+
+    production_name = dataset['production']
+    production = Production[production_name]
+    print(production)
+
+    from pprint import pprint
+    all_runs = {x for v in dataset['runlists'].values() for x in v}
+
+    #     out = sp.check_output(["alien_find", "-x", 'run%d' % run, production.])
+    #     print(out)
+    #     exit(0)
+
+    # print(c)
+    # dataset = Dataset(args.name, c['production'], c)
+    from appdirs import user_data_dir
+    data_dir = Path(user_data_dir('alimaster'))
+    if not data_dir.exists():
+        data_dir.mkdir(parents=True)
+
+    database_path = data_dir / 'gridfiles.db'
+    abc_build(production, all_runs, database_path)
+
+
+def abc_build(production, all_runs, database_path):
+
+    import sqlite3
+    # db = sqlite3.connect(database_path)
+    with sqlite3.connect(database_path) as db:
+        setup_databse(db)
+
+        for run in all_runs:
+            c = db.cursor()
+            c.execute("""SELECT *
+                        FROM file_metadata
+                        WHERE lfn LIKE '%%/000%s/%%';
+                    """ % run)
+            files = []
+            for row in c:
+                files.append(row)
+
+            print(run, ':', len(files))
+            if not files:
+
+                print("fetching", run)
+                cachefile = Path("run%d.xml" % run)
+                from xml.etree import ElementTree as ET
+                if cachefile.exists():
+                    xml = ET.parse(cachefile)
+                else:
+                    xml = production.fetch_xml_object_of_run(run)
+                    cachefile.write_bytes(ET.tostring(xml))
+
+                keys = ['lfn', 'md5', 'guid', 'size', 'type']
+                insert_data = [[filerow.attrib[k] for k in keys]
+                            for filerow in xml.iterfind("./collection/event/file")]
+
+                c.executemany("""
+                            INSERT INTO file_metadata(lfn,md5,guid,size,type)
+                            VALUES (?, ?, ?, ?, ?)
+                            """, insert_data)
+    # import peewee
+    # from playhouse.sqlite_ext import SqliteExtDatabase
+    # import datetime
+
+    # from alimaster.db.schema import GridFileMetadata
+    # db = SqliteExtDatabase(databasepathfile)
+    # GridFileMetadata.database = db
+    # file = GridFileMetadata()
+    # file.save()
+
+    # db = GridFileMetadata()
+    # db.save()
+
+    # import alimaster
+    # with alimaster.env() as ali:
+    #     ali
+    # from ROOT import
+    # from alimaster.db import *
+    # db =
+
+def setup_databse(db):
+    db.execute('''CREATE TABLE IF NOT EXISTS file_metadata
+                  (lfn text, md5 text, guid uuid, size int, type text)''')
+
+    db.execute('''CREATE TABLE IF NOT EXISTS production
+                  (name text, data text, size int, lfn text, md5 text, guid uuid)''')
+
+
+
+def main_help(args):
+    pass
+
+
+if __name__ == "__main__":
+    exit(main())
