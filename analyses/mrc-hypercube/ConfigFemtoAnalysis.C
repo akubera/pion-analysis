@@ -54,9 +54,11 @@ static const ULong_t filter_mask = BIT(7);
 void
 AddEventReader(AliFemtoManager &mgr)
 {
-  AliFemtoEventReaderAOD *rdr = new AliFemtoEventReaderAlt();
+  auto *rdr = new AliFemtoEventReaderAlt();
 
   auto multest = AliFemtoEventReaderAOD::EstEventMult::kCentrality;
+
+  rdr->SetEnhanceSmearing(0.1);
 
   rdr->SetFilterMask(filter_mask);
   rdr->SetEPVZERO(0);
@@ -105,12 +107,13 @@ AddAnalysis(TString name, AFAPP::AnalysisParams a, AFAPP::CutParams c, AliFemtoM
 
   analysis->AddCorrFctn(ktmrc1d);
 
-  int out_nbins = 32;
-  double out_max = out_nbins * (0.1125 / 22);
+  // bins match CF_PbPb#6986
+  int out_nbins = 38;
+  double out_max = out_nbins * (0.1525000035762787 / 30);
   auto *mrc_cf = new AliFemtoModelCorrFctnTrueQ6D("MRC",
-                  out_nbins, 0, out_max,
-                  61, -0.1525, 0.1525,
-                  61, -0.1525, 0.1525);
+                  out_nbins, 0.0, out_max,
+                  61, -0.1525000035762787, 0.1525000035762787,
+                  61, -0.1525000035762787, 0.1525000035762787);
 
   auto *ktmrc = new AliFemtoKtBinnedCorrFunc("KT_HYPERCUBE", mrc_cf);
 
@@ -149,7 +152,7 @@ ConfigFemtoAnalysis()
 
   AFAPP::AnalysisParams acfg = AFAPP::DefaultConfig();
   acfg.pion_type_2 = AFAPP::kNone;
-  acfg.num_events_to_mix = 7;
+  acfg.num_events_to_mix = 8;
   acfg.enable_pair_monitors = false;
   acfg.is_mc_analysis = true;
   // acfg.calc_automult(ccfg);

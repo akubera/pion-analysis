@@ -59,26 +59,34 @@ def main(argv=None):
     cmd_out, *_ = cmd.communicate()
     jl = JobList(cmd_out)
 
-    for pid in tqdm(jl.done()):
-        print(pid)
-        cmd = run(['alien_ps', '-jdl', pid])
-        cmd_out, *_ = cmd.communicate()
+    jdl_archive_file = args.output or 'jdl-index.bz2'
 
-        m = re.search(r"InputData\s=\s+{([^}]+)}", cmd_out, re.M)
+    for pid in tqdm(jl.done()):
+        ps_proc = run(['alien_ps', '-jdl', pid])
+        jdl, *_ = ps_proc.communicate()
+
+        m = re.search(r"InputData\s=\s+{([^}]+)}", jdl, re.M)
+        if not m:
+            continue
 
         input_dirs = [Path(a.group(1)).parent
                       for a in re.finditer("LF:([^,]+)", m.group(1))]
 
-        for input_dir in tqdm(input_dirs):
-            rmdir_proc = run(['alien_rmdir', input_dir])
-            rmdir_proc.wait()
+        # for input_subdir in tqdm(input_dirs, desc=pid):
+        rmdir_proc = run(['alien_rmdir', *input_dirs])
+        rmdir_proc.wait()
 
         kill_proc = run(['alien_kill', pid])
         kill_proc.wait()
 
+        # save_jdl_to_archive(jdl, jdl_archive_file)
+
     return 0
 
-    jdl_archive = Path(args.output or 'jdl-index.bz2')
+
+def save_jdl_to_archive(jdl, output):
+
+    jdl_archive = Path(output)
     if jdl_archive.suffix == '.bz2':
         compression = ZIP_BZIP2
     else:

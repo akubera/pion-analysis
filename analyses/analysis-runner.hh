@@ -30,6 +30,7 @@
 
 /// Define this in the RunAnalysis macro
 void RunAnalysis(std::vector<std::string> args);
+void setup_grid(AliAnalysisManager*, TString workdir, TString mode);
 
 
 void
@@ -51,18 +52,27 @@ RunAnalysis()
 
 
 AliAnalysisManager*
-NewAnalysisManagerExec(TString wd="")
+NewGridRunAnalysisManager(TString wd)
 {
-  TString abc = wd.IsWhitespace() ? "abc" : wd;
-  return new AliAnalysisManager(abc);
+  auto *mgr = new AliAnalysisManager("mgr-" + wd);
+  setup_grid(mgr, wd, "full");
+  return mgr;
 }
 
 
 AliAnalysisManager*
-NewAnalysisManagerMerge(TString wd="")
+NewGridMergeAnalysisManager(TString wd="")
 {
-  TString abc = wd.IsWhitespace() ? "abc" : wd;
-  return new AliAnalysisManager("mergemgr");
+  auto *mgr = new AliAnalysisManager("mgr-" + wd);
+  setup_grid(mgr, wd, "terminate");
+  return mgr;
+}
+
+AliAnalysisManager*
+NewLocalAnalysisManager(TString wd="")
+{
+  auto *mgr = new AliAnalysisManager("mgr-" + wd);
+  return mgr;
 }
 
 

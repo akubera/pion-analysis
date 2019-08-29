@@ -119,6 +119,9 @@ AddTasks()
          ~do_sharequality_cf=true; ~q3d_bin_count=39; ~q3d_maxq=0.117;
          ~mcwg_lednicky = true; ~mcwg_strong = false; ~mcwg_3body = false;
          ~eventreader_filter_bit=128;  ~eventreader_multibit=true;  ~eventreader_read_full_mc=true;
+       ~eventreader_dca_globaltrack = 0;
+        $pion_1_max_impact_xy = 2.0;
+        $pion_1_max_impact_z = 2.0;
          @is_mc_analysis = true; ~trueq3d_extra_bins = true; @num_events_to_mix = 4;
          @enable_pair_monitors=false;  $mc_pion_only=true; $pair_delta_eta_min = 0.01;
          $pair_delta_phi_min = 0.03; $pion_1_rm_neg_lbl = false; $pion_1_sigma = 3.0;
@@ -149,6 +152,7 @@ AddTasks()
        ~do_sharequality_cf=true; ~q3d_bin_count=39; ~q3d_maxq=0.117;
        ~mcwg_lednicky = true; ~mcwg_strong = false; ~mcwg_3body = false;
        ~eventreader_filter_bit=128;  ~eventreader_multibit=true;  ~eventreader_read_full_mc=true;
+       ~eventreader_dca_globaltrack = 0;
        @is_mc_analysis = true; ~trueq3d_extra_bins = true; @num_events_to_mix = 4;
        @enable_pair_monitors=false;  $mc_pion_only=true; $pair_delta_eta_min = 0.01;
        $pair_delta_phi_min = 0.03; $pion_1_sigma = 3.0; $pion_1_min_tpc_chi_ndof = 0.33;
@@ -183,7 +187,7 @@ RunLocal(TString wd)
   mgr->PrintStatus();
 
   TChain *input = new TChain("aodTree");
-  for (int run_num : {1, 2, 3, 4}) {
+  for (int run_num : {1}) {
     input->Add(Form("/alice/sim/2016/LHC16g1a/246980/AOD/%03d/AliAOD.root", run_num));
   }
 

@@ -15,6 +15,13 @@ class Production:
     archive: str
     is_mc: bool
 
+    @classmethod
+    def From(cls, obj):
+        if isinstance(obj, cls):
+            return obj
+
+        return cls(name=obj['name'])
+
     def query_for_run(self, run):
         path = '%s/%s%d' % (self.data_dir, self.prefix, run)
         path += '/' + self.pattern.rstrip("*")

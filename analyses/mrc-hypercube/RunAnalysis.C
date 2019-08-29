@@ -227,6 +227,9 @@ RunMergeAnalysis(TString wd)
 void
 RunLocalAnalysis(TString wd)
 {
+  TStopwatch timer;
+  timer.Start();
+
   gSystem->mkdir(wd);
   gSystem->CopyFile("ConfigFemtoAnalysis.C", wd + "/ConfigFemtoAnalysis.C");
   gSystem->cd(wd);
@@ -236,11 +239,13 @@ RunLocalAnalysis(TString wd)
   mgr->PrintStatus();
 
   TChain *input = new TChain("aodTree");
-  for (int run_num : {1, 2, 3, 4}) {
+  for (int run_num : {1, 2}) {
     input->Add(Form("/alice/sim/2016/LHC16g1/246928/AOD198/%04d/AliAOD.root", run_num));
   }
 
   mgr->StartAnalysis("local", input);
+  timer.Stop();
+  timer.Print();
 
   TString outfile = wd + "/" + mgr->GetCommonFileName();
   std::cout << "Output written to " << outfile << "\n";
