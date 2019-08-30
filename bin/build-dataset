@@ -3,12 +3,16 @@
 # build-dataset
 #
 
+from typing import List
+
 import os
 import sys
 import subprocess as sp
+from hashlib import md5
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from zipfile import ZipFile
 from xml.etree import ElementTree
+from tempfile import TemporaryDirectory
 
 from tqdm import tqdm
 
@@ -37,10 +41,6 @@ def main(argv=None):
         print("Error: Could not find alien_find executable", file=sys.stderr)
         return 1
 
-
-    from zipfile import ZipFile
-
-
     # data_path = '/alice/sim/2016/LHC16i3a/246217'
 
     production = 'LHC18e1'
@@ -50,17 +50,16 @@ def main(argv=None):
 
     runs = {245954, 245700, 245829, 246087, 245831, 245705, 246089, 246217, 245833, 245963}
     runs = {246042, 246048, 245793, 246178, 246049, 246053, 246182, 246181, 245683, 245692, 245949, 245952,}
-    runs = {245954, 245700, 245829, 246087, 245831, 245705, 246089, 246217, 245833, 245963, 246222, 246225, }
+    runs = {245954, 245700, 245829, 246087, 245831, 245705, 246089, 246217, 245833, 245963, 246222, 246225,}
     runs = {246675, 246676, 246805, 246804, 246807, 246424, 246808, 246809, 246428, 246431, 246945, 246434,}
-    runs = { 246272, 246275, 246148, 246276, 245766, 246151, 246152, 246153, 245775, 246036, 246037, 245785,
-     246042, 246048, 245793, 246178, 246049, 246053, 246182, 246181, 245683, 245692, 245949, 245952,
-     245954, 245700, 245829, 246087, 245831, }
+    runs = {246272, 246275, 246148, 246276, 245766, 246151, 246152, 246153, 245775, 246036, 246037, 245785,
+            246042, 246048, 245793, 246178, 246049, 246053, 246182, 246181, 245683, 245692, 245949, 245952,
+            245954, 245700, 245829, 246087, 245831}
 
     collection_info = f'{production}:file_pattern:{runs}'
     # print(ElementTree.tostring(xml).decode())
 
 
-    from hashlib import md5
     def get_hashname(prod, patt, run):
         if isinstance(run, int):
             runs = (run, )
@@ -111,11 +110,7 @@ def main(argv=None):
                 filenames.append(str(runpath))
 
             # merge collection
-            collections = [TAlienCollection.Open(filename) for filename in filenames]
-
-            merged_collection = collections.pop()
-            for coll in collections:
-                merged_collection.AddFast(coll)
+            merged_collection = build_merged_collection(filenames)
 
             print('Adding merged collection:', name)
 
@@ -188,6 +183,14 @@ def main(argv=None):
     collection = TAlienCollection.Open("tmp.xml")
     collection.ExportXML(dest, False, False, collection_name, "Created By AliMaster")
 
+
+
+def build_merged_collection(filenames: List[str]):
+    merged_collection = TAlienCollection.Open(filenames[0])
+    for filename in filenames[1:]:
+        merged_collection.AddFast(TAlienCollection.Open(filename))
+
+    return merged_collection
 
 
 if __name__ == "__main__":
