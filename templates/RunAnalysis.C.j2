@@ -9,6 +9,10 @@
 #include <TInterpreter.h>
 #include <TApplication.h>
 #include <TPython.h>
+#include <TDOMParser.h>
+
+#include <AliAnalysisAlien.h>
+#include <AliAnalysisManager.h>
 
 #include <iostream>
 
@@ -20,7 +24,7 @@ SetupGrid(AliAnalysisManager *mgr, TString gridmode)
   alien->SetRunMode(gridmode);
   alien->SetGridOutputDir("output");
   alien->SetGridWorkingDir("{{ workdir }}");
-  alien->SetAliPhysicsVersion("vAN-20190810_ROOT6-1");
+  alien->SetAliPhysicsVersion("{{ aliphysics_version }}");
   alien->SetDropToShell(false);
   alien->SetCheckCopy(false);
   alien->SetMaxMergeFiles(25);
@@ -37,20 +41,12 @@ SetupGrid(AliAnalysisManager *mgr, TString gridmode)
 void
 AddTasks(AliAnalysisManager &)
 {
-  gROOT->Macro("$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C");
-  gROOT->Macro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C(kTRUE, kTRUE, kTRUE)");
-  gROOT->Macro("$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C");
-
-  gROOT->LoadMacro("$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C");
-
-  {% for name, params in analysis_params %}
-
-  gROOT->ProcessLine(
-    R"""(AddNuTaskPionPionRoot6("{{name}}",
-                                "",
-                                R"( {{params}} )" ); )""");
+  {% for task in analysis['tasks'] %}
+      {% if 'args' not in task %} gROOT->Macro("{{ task['macro'] }}");
+      {% else %} gROOT->Macro(
+        R""({{ task['macro'] }}(
+        {{ task['args']}}) )""); {% endif %}
   {% endfor %}
-
 }
 
 AliAnalysisManager*
@@ -77,10 +73,17 @@ void
 StartGridMerge()
 {
   auto *tfile = TFile::Open("analysis.root");
-  auto *mgr = static_cast<AliAnalysisManager*>(tfile->Get("mgr"));
-  /*
-  auto *mgr = CreateAnalysisManager();
-  */
+  if (!tfile) {
+    std::cerr << "Could not load analysis.root, was 'grid' run?\n";
+    exit(1);
+  }
+
+  auto *mgr = dynamic_cast<AliAnalysisManager*>(tfile->Get("mgr"));
+  if (!mgr) {
+    std::cerr << "Could not mgr from analysis.root\n";
+    exit(1);
+  }
+
   SetupGrid(mgr, "terminate");
 
   mgr->InitAnalysis();
@@ -89,33 +92,42 @@ StartGridMerge()
 }
 
 void
-StartGridReduce()
+StartGridReduce(std::string stage_file="")
 {
-  int Stage_i = -1;
-  for (int i=9; i>0; --i) {
-    std::ifstream stage_file(Form("Stage_%d.xml", i));
+  if (stage_file == "") {
+    int i = 9;
+    for (; i>0; --i) {
+      stage_file = Form("Stage_%d.xml", i);
+      std::ifstream stage_stream(stage_file);
 
-    if (stage_file.good()) {
-      char ans[100] = {'\0'};
-      std::cout << "\n  Are you sure Stage " << i << " has finished? ";
-      std::cin >> ans;
-      std::string answer(ans);
-
-      if (answer != "yes" && answer != "y") {
-        std::cout << "  Aborting.\n\n";
-        return;
+      if (stage_stream.good()) {
+        break;
       }
 
-      Stage_i = i;
-
-      break;
+    }
+    if (i == 0) {
+      std::cerr << "Could not find Stange file\n";
+      return;
     }
   }
-  std::cout << "Reducing merging Stage_" << Stage_i << ".xml\n";
+
+  const int Stage_i = std::stoi(std::string(stage_file.begin()+6, stage_file.end()));
+
+  {
+    char ans[100] = { '\0' };
+    std::cout << "\n  Are you sure Stage " << Stage_i << " has finished? ";
+    std::cin >> ans;
+    std::string answer(ans);
+
+    if (answer != "yes" && answer != "y") {
+      std::cout << "  Aborting.\n\n";
+      return;
+    }
+  }
 
   TDOMParser parser;
   parser.SetValidate(false);
-  parser.ParseFile(Form("Stage_%d.xml", Stage_i));
+  parser.ParseFile(stage_file.c_str());
 
   TXMLNode *alien = parser.GetXMLDocument()->GetRootNode();
   TXMLNode *collection = alien->GetChildren()->GetNextNode();
@@ -163,9 +175,8 @@ StartGridReduce()
       if (loc == current_output_files.end()) {
         continue;
       }
-      break;
-      std::cout << "REMOVING" << filedir << "\n";
-      // grid->Rmdir(filedir.c_str());
+      std::cout << "REMOVING " << filedir << "\n";
+      grid->Rmdir(filedir.c_str());
       current_output_files.erase(loc);
     }
   }
@@ -227,7 +238,11 @@ RunAnalysis(std::vector<std::string> args)
   }
 
   if (args[0] == "reduce") {
-
+    if (args.size() > 1) {
+      StartGridReduce(args[1]);
+    } else {
+      StartGridReduce();
+    }
   }
 
 }
