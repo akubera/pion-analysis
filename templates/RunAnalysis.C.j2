@@ -150,7 +150,7 @@ StartGridReduce(std::string stage_file="")
   for (int i=0; i<ls->GetEntries(); ++i) {
     TString filename(ls->GetFileName(i));
     TString filepath(ls->GetFileNamePath(i));
-    if (filename.Atoi()) {
+    if (Stage_i != 1 or filename.Atoi()) {
       current_output_files.emplace(filepath);
     }
   }
