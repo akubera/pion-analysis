@@ -155,6 +155,18 @@ StartGridReduce(std::string stage_file="")
     }
   }
 
+  // include newly created files
+  if (Stage_i > 1) {
+    std::unique_ptr<TGridResult> ls_output(grid->Ls(grid_output_dir.c_str()));
+    for (int i=0; i<ls_output->GetEntries(); ++i) {
+      TString filename(ls_output->GetFileName(i));
+      TString filepath(ls_output->GetFileNamePath(i));
+      if (filename.Atoi()) {
+        current_output_files.emplace(filepath);
+      }
+    }
+  }
+
   if (current_output_files.empty()) {
     std::cout << "Nothing to do\n";
     return;
@@ -175,6 +187,7 @@ StartGridReduce(std::string stage_file="")
       if (loc == current_output_files.end()) {
         continue;
       }
+
       std::cout << "REMOVING " << filedir << "\n";
       grid->Rmdir(filedir.c_str());
       current_output_files.erase(loc);
@@ -183,7 +196,7 @@ StartGridReduce(std::string stage_file="")
 
   std::cout << "Moving finished files into merge dir:\n";
 
-  for (auto filepath : current_output_files) {
+  for (const auto &filepath : current_output_files) {
     std::string dirname(filepath, filepath.find_last_of('/')+1);
     std::string dest(grid_merge_dir + "/X" + dirname);
     std::cout << "Moving " << filepath << "\n";
@@ -194,10 +207,6 @@ StartGridReduce(std::string stage_file="")
     grid->Rmdir(filepath.c_str());
   }
 
-  // std::cout << "->: " << cnode->GetNextNode()->GetNodeName() << "\n";
-  // std::cout << "  : " << cnode->GetContent() << "\n";
-
-  // xml_parser(OnStartElement(const char *, const TList *))
 }
 
 void
