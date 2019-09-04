@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+#
+# mv-unmerged
+#
+
+import sys
+import re
+
+import subprocess as sp
+from pathlib import Path
+from functools import partial
+
+from tqdm import tqdm
+
+
+run = partial(sp.Popen, stdout=sp.PIPE, encoding='utf-8')
+
+
+def argparser():
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("-y", "--yes",
+                        action='store_true',
+                        help="Yes to prompts")
+    parser.add_argument("-o", "--output",
+                        default=None,
+                        help="Output file")
+    parser.add_argument("--ignore",
+                        action='store_true',
+                        help='this option is ignored')
+    parser.add_argument('grid_path')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = argparser().parse_args(argv)
+
+    from ROOT import TGrid
+
+    grid = TGrid.Connect("alien://")
+    grid_path = Path(grid.GetHomeDirectory()) / args.grid_path / 'output'
+
+    print('Moving unmerged ROOT files found in', grid_path)
+
+    if not args.yes:
+        user_res = input("Are you sure all remaing ROOT files "
+                         "are independent? ")
+        if user_res.lower() not in ("y", "yes"):
+            return 1
+
+    stagexmls_query = grid.Query(str(grid_path), "Stage_*.xml", "", "")
+    stage_xmls = [Path(str(s.GetValue('lfn'))) for s in stagexmls_query]
+
+    max_stage = len(stage_xmls)
+    assert stage_xmls[-1].name == 'Stage_%d.xml' % max_stage
+    print('Found %d xml file%s' % (max_stage, '' if max_stage == 1 else 's'))
+
+    dest_root = grid_path / f'Stage_{max_stage}'
+
+    root_query = grid.Query(str(grid_path), "*.root", "", "")
+    root_file_paths = [p 
+                       for p in (Path(str(s.GetValue('lfn'))).parent for s in root_query)
+                       if p.parent != dest_root]
+
+    root_file_relpaths = [p.relative_to(grid_path) for p in root_file_paths]
+
+    dests = []
+    for relpath in root_file_relpaths:
+        m = re.match(r'Stage_(\d+)', relpath.parts[0])
+        if not m:
+            dest = 'X%s' % relpath.parts[0]
+        else:
+            idx = int(m.group(1))
+            assert idx != max_stage
+            dest = 'X%ss%02d' % (relpath.parts[1], idx)
+        dests.append(dest_root / dest)
+
+    # for src, dest in tqdm(list(zip(root_file_paths, dests))):
+    src_dest_pairs = list(zip(root_file_paths, dests))
+    for src, dest in src_dest_pairs:
+        print(src, '->', dest)
+        grid.Mkdir(str(dest))
+        mv_cmd = run(['alien_mv', f'{src}/*', f'{dest}/'], stderr=sp.DEVNULL)
+        mv_cmd.wait()
+        if mv_cmd.returncode != 0:
+            # grid.Rmdir(str(dest))
+            continue
+        grid.Rmdir(str(src))
+
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())
