@@ -1,0 +1,37 @@
+---
+aliphysics-version: "vAN-20190825_ROOT6-1"
+max-input-files: 10
+max-merge-files: 35
+ttl: "8 * 60 * 60"
+
+tasks:
+  - macro: '$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C'
+  - macro: '$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C'
+  - macro: '$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C'
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "sys_evVz_a", "",
+      "{0:5:10:20}; (0.2:0.3:0.4:0.6:0.7:0.8:1.0);"
+      "~do_kt_qinv_cf = true; ~qinv_bin_size_MeV=2.5;"
+      "$event_vertex_z = {-4.0, 4.0}; "
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "sys_evVz_b", "",
+      "{0:5:10:20}; (0.2:0.3:0.4:0.6:0.7:0.8:1.0);"
+      "~do_kt_qinv_cf = true; ~qinv_bin_size_MeV=2.5;"
+      "$event_vertex_z = {-6.0, 6.0}; "
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "sys_evVz_c", "",
+      "{0:5:10:20}; (0.2:0.3:0.4:0.6:0.7:0.8:1.0);"
+      "~do_kt_qinv_cf = true; ~qinv_bin_size_MeV=2.5;"
+      "$event_vertex_z = {-8.0, 8.0}; "
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "sys_evVz_d", "",
+      "{0:5:10:20}; (0.2:0.3:0.4:0.6:0.7:0.8:1.0);"
+      "~do_kt_qinv_cf = true; ~qinv_bin_size_MeV=2.5;"
+      "$event_vertex_z = {-10.0, 10.0}; "
