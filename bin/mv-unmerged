@@ -55,7 +55,7 @@ def main(argv=None):
 
     max_stage = len(stage_xmls)
     assert stage_xmls[-1].name == 'Stage_%d.xml' % max_stage
-    print('Found %d xml file%s' % (max_stage, '' if max_stage == 1 else 's'))
+    print('Moving remaining files to stage %d' % max_stage)
 
     dest_root = grid_path / f'Stage_{max_stage}'
 
@@ -82,11 +82,16 @@ def main(argv=None):
     for src, dest in src_dest_pairs:
         print(src, '->', dest)
         grid.Mkdir(str(dest))
-        mv_cmd = run(['alien_mv', f'{src}/*', f'{dest}/'], stderr=sp.DEVNULL)
-        mv_cmd.wait()
-        if mv_cmd.returncode != 0:
-            # grid.Rmdir(str(dest))
-            continue
+        # mv_cmd = run(['alien_mv', f'{src}/*', f'{dest}/'], stderr=sp.DEVNULL)
+        mv_cmd = run(['alien_mv', f'{src}/*', f'{dest}/'])
+        mv_stdout, mv_stderr = mv_cmd.communicate()
+
+        if mv_cmd.returncode != 1:
+            grid.Rmdir(str(dest))
+            print("Move command failed")
+            print(mv_stdout)
+            print(mv_stderr)
+            return 1
         grid.Rmdir(str(src))
 
     return 0
