@@ -27,9 +27,9 @@ SetupGrid(AliAnalysisManager *mgr, TString gridmode)
   alien->SetAliPhysicsVersion("{{ aliphysics_version }}");
   alien->SetDropToShell(false);
   alien->SetCheckCopy(false);
-  alien->SetMaxMergeFiles(25);
-  alien->SetMaxMergeStages(10);
-  alien->SetSplitMaxInputFileNumber({{ SPLIT or 24 }});
+  alien->SetMaxMergeFiles({{ analysis.get('max-merge-files', 25) }});
+  alien->SetMaxMergeStages({{ analysis.get('max-merge-stages', 9) }});
+  alien->SetSplitMaxInputFileNumber({{ analysis.get('max-input-files', 45) }});
   alien->SetMergeViaJDL(true);
   alien->SetTTL({{ TTL or 12 * 60 * 60 }});
   alien->AddAdditionalLibrary("{{ ' '.join(upload_files or []) }}");
