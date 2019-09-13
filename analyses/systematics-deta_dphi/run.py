@@ -71,7 +71,7 @@ def main(argv=None):
 
         (dest_wrkdir / 'RunAnalysis.C').write_text(txt)
 
-    (local_workdir / 'settings.json').write_text(json.dumps({'analysis': analysis, 'data': data}))
+    (local_workdir / 'settings.json').write_text(json.dumps({'analysis': analysis, 'data': data}, indent=1))
 
     print(local_workdir)
 
