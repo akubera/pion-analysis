@@ -68,6 +68,11 @@ def main(argv=None):
 
     dests = []
     for relpath in root_file_relpaths:
+
+        if not relpath.parts:
+            print("Could not load Stage directory")
+            return 1
+
         m = re.match(r'Stage_(\d+)', relpath.parts[0])
         if not m:
             dest = 'X%s' % relpath.parts[0]
@@ -86,8 +91,8 @@ def main(argv=None):
         mv_cmd = run(['alien_mv', f'{src}/*', f'{dest}/'])
         mv_stdout, mv_stderr = mv_cmd.communicate()
 
-        if mv_cmd.returncode != 1:
-            grid.Rmdir(str(dest))
+        if mv_stderr:
+            # grid.Rmdir(str(dest))
             print("Move command failed")
             print(mv_stdout)
             print(mv_stderr)
