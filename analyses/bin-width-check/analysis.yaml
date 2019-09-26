@@ -1,0 +1,61 @@
+---
+aliphysics-version: "vAN-20190920_ROOT6-1"
+max-input-files: 60
+max-merge-files: 15
+ttl: "14 * 3600"
+
+tasks:
+  - macro: '$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C'
+  - macro: '$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C'
+  - macro: '$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C'
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "binwidth_3", "",
+      "{0:5,10:20,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=75; ~q3d_maxq=0.1125;"
+      "~eventreader_dca_globaltrack = 0;"
+      "@num_events_to_mix = 4;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.0;"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "binwidth_5", "",
+      "{0:5,10:20,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=45; ~q3d_maxq=0.1125;"
+      "~eventreader_dca_globaltrack = 0;"
+      "@num_events_to_mix = 4;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.0;"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "binwidth_7", "",
+      "{0:5,10:20,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=33; ~q3d_maxq=0.1155;"
+      "~eventreader_dca_globaltrack = 0;"
+      "@num_events_to_mix = 4;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.0;"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "binwidth_10", "",
+      "{0:5,10:20,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=27; ~q3d_maxq=0.1350;"
+      "~eventreader_dca_globaltrack = 0;"
+      "@num_events_to_mix = 4;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.0;"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
