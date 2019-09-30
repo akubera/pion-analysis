@@ -44,7 +44,7 @@ struct AliFoo : public AliFemtoCorrFctn {
         &track2 = *pair->Track2()->Track();
 
       if (std::abs(ql) < 0.002) {
-        if (std::abs(qo - 0.004) < 1e-2 && std::abs(qs - .005) < 1e-1) {
+        if (std::abs(qo - 0.04) < 4e-3 && std::abs(qs - 0.00375) < 0.00375) {
           std::stringstream s1,
                             s2;
 

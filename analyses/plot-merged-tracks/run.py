@@ -133,12 +133,12 @@ def run_analysis(output_name, files):
     from pathlib import Path
 
     # redirect stdout
-    sys.stdout.flush()
-    newstdout = os.dup(1)
-    devnull = os.open(os.devnull, os.O_WRONLY)
-    os.dup2(devnull, 1)
-    os.close(devnull)
-    sys.stdout = os.fdopen(newstdout, 'w')
+    # sys.stdout.flush()
+    # newstdout = os.dup(1)
+    # devnull = os.open(os.devnull, os.O_WRONLY)
+    # os.dup2(devnull, 1)
+    # os.close(devnull)
+    # sys.stdout = os.fdopen(newstdout, 'w')
 
     from ROOT import TFile, TChain
     input_files = TChain("aodTree")
