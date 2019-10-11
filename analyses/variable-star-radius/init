@@ -1,0 +1,157 @@
+#!/usr/bin/env python
+#
+# variable-star-radius/init
+#
+
+import sys
+from pathlib import Path
+import json
+import yaml
+
+
+def arg_parser():
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument('--data',
+                        default='data.yaml')
+    parser.add_argument('--analysis',
+                        default='analysis.yaml')
+    parser.add_argument('--local',
+                        action='store_true',
+                        help='Create local analysis')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+
+    from datetime import datetime
+    tag = f'{datetime.now():%y%m%d%H%M%S}'
+
+    __dir__ = Path(__file__).absolute().parent
+
+    if args.local:
+        print("Creating local analysis")
+        with open(args.data) as f:
+            paths = []
+            file_list = [line.strip() for line in f]
+            for path in map(Path, file_list):
+                if not path.exists():
+                    print("Warning: path %s does not exist" % path)
+                    continue
+                paths.append(path)
+
+            print(f"Loaded {len(paths)} files")
+
+        return
+
+    data = yaml.safe_load((__dir__ / args.data).read_text())
+    analysis = yaml.safe_load((__dir__ / args.analysis).read_text())
+    macro_template = __dir__.parent.parent / 'templates' / 'RunAnalysis.C.j2'
+
+    from alimaster.datasets import Production
+    from jinja2 import Template
+
+    macro_txt = macro_template.read_text()
+    t = Template(macro_txt)
+
+    production = Production.From(data['production'])
+
+    vals = {
+        'aliphysics_version': analysis['aliphysics-version'],
+        'TTL': analysis.get('ttl', '8 * 60 * 60'),
+        'production': production,
+        'analysis': analysis,
+    }
+
+    from ROOT import TGrid
+
+    grid = TGrid.Connect("alien://")
+
+    local_workdir = __dir__ / "gridresults" / f'job-{tag}'
+    local_workdir.mkdir(parents=True)
+
+    for i, (dset_name, runs) in enumerate(data['datasets'].items(), 1):
+        hashname = production.get_hashname(runs)
+
+        xmlfilename = production.build_xml_dataset(runs, grid=grid)
+        workdir = 'job-%s-%02d' % (tag, i)
+        result_filename = 'AnalysisResults-%s-%s.root' % (tag, dset_name)
+        dest_wrkdir = local_workdir / dset_name
+        dest_wrkdir.mkdir()
+
+        txt = t.render(**vals,
+                       xmlfile=Path(grid.GetHomeDirectory()) / 'xml' / xmlfilename,
+                       workdir=workdir,
+                       output_filename=result_filename)
+
+        (dest_wrkdir / 'RunAnalysis.C').write_text(txt)
+
+    (local_workdir / 'settings.json').write_text(json.dumps({'analysis': analysis, 'data': data}, indent=1))
+
+    print(local_workdir)
+
+
+async def run_multiproc_analysis(files, threads=None):
+    """
+    Run multi-process analysis
+    """
+    from pprint import pprint
+    from functools import partial
+    from itertools import starmap as smap
+    from asyncio import wait, FIRST_COMPLETED
+
+    threads = threads or len(os.sched_getaffinity(0))
+
+    executor = ProcessPoolExecutor()
+    loop = asyncio.get_running_loop()
+    parallel_run = partial(loop.run_in_executor, executor, run_analysis)
+
+    file_list = [files[i::threads] for i in range(threads)]
+    file_list = filter(None, file_list)
+
+    with tempfile.TemporaryDirectory() as tdir:
+        tdir = Path(tdir)
+
+        tmp_result_files = [tdir / ('AnalysisResults%d.root' % i)
+                            for i in range(len(file_list))]
+
+        pending = list(smap(parallel_run, zip(tmp_result_files, file_list)))
+        finished = []
+        with tqdm(total=len(pending)) as pbar:
+            while pending:
+                done, pending = await wait(pending,
+                                           loop=loop,
+                                           return_when=FIRST_COMPLETED)
+                finished.extend([r.result() for r in done])
+                pbar.update(len(done))
+
+        hadd_cmd = ['hadd', '-f', 'Results.root',  *tmp_result_files]
+        hadd_proc = sp.run(hadd_cmd, check=True)
+
+    return finished
+
+
+def run_analysis(output_name, files):
+    import os
+    from pathlib import Path
+
+    # redirect stdout
+    sys.stdout.flush()
+    newstdout = os.dup(1)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, 1)
+    os.close(devnull)
+    sys.stdout = os.fdopen(newstdout, 'w')
+
+    from ROOT import TFile, TChain
+    input_files = TChain("aodTree")
+
+    for filename in map(str, files):
+        input_files.Add(filename)
+
+
+if __name__ == "__main__":
+    exit(main())
