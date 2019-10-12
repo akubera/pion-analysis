@@ -59,8 +59,13 @@ def main(argv=None):
 
     dest_root = grid_path / f'Stage_{max_stage}'
 
+    output_files = sp.check_output(['alien_ls', grid_path]).decode().split('\n')
+    if dest_root.name not in output_files:
+        print(f"Missing destination directory {dest_root.name}", file=sys.stderr)
+        return 1
+
     root_query = grid.Query(str(grid_path), "*.root", "", "")
-    root_file_paths = [p 
+    root_file_paths = [p
                        for p in (Path(str(s.GetValue('lfn'))).parent for s in root_query)
                        if p.parent != dest_root]
 
