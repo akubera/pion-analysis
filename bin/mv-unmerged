@@ -59,8 +59,9 @@ def main(argv=None):
 
     dest_root = grid_path / f'Stage_{max_stage}'
 
-    output_files = sp.check_output(['alien_ls', grid_path]).decode().split('\n')
-    if dest_root.name not in output_files:
+    try:
+        sp.check_call(['alien_ls', dest_root], stdout=sp.PIPE)
+    except sp.CalledProcessError:
         print(f"Missing destination directory {dest_root.name}", file=sys.stderr)
         return 1
 
