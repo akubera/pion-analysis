@@ -1,0 +1,30 @@
+---
+aliphysics-version: "vAN-20191015_ROOT6-1"
+max-input-files: 42
+max-merge-files: 15
+ttl: "24 * 60 * 60"
+
+tasks:
+  - macro: '$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C'
+  - macro: '$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C'
+  - macro: '$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C'
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "pion_analysis", "",
+      "{0:5:10:20:30:40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
+      "~do_sharequality_cf=true; "
+      "~do_kt_detadphistar_cf=true; ~do_detadphistar_cf=true;"
+      "~do_avg_sep_cf=true; ~do_kt_avg_sep_cf=true;"
+      "@num_events_to_mix = 3;"
+      "~eventreader_dca_globaltrack = 0;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.3;"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tpctof = 1.0;"
+      "$pair_phi_star_radius=1.15;"
+      "$pion_1_pt={0.16, 1.15};"
+      "$pair_delta_eta_min=0.02; $pair_delta_phi_min=0.046;"
