@@ -30,7 +30,8 @@ def argparser():
     parser.add_argument("--ignore",
                         action='store_true',
                         help='this option is ignored')
-    parser.add_argument('masterjob')
+    parser.add_argument('masterjob',
+                        nargs='+',)
     return parser
 
 
@@ -38,7 +39,6 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
     args = argparser().parse_args(argv)
-    print('removing source files for masterjob', args.masterjob)
 
     env = os.environ.copy()
 
@@ -55,11 +55,19 @@ def main(argv=None):
         cmd_out, *_ = cmd.communicate()
         exec(cmd_out)
 
-    cmd = run(['gbbox', 'ps', '-As', f'-id={args.masterjob}'])
+    jdl_archive_file = args.output or 'jdl-index.bz2'
+
+    for masterjob in args.masterjob:
+        remove_sources_files(masterjob)
+
+    return 0
+
+
+def remove_sources_files(masterjob, jdl_archive_file=None):
+    print('removing source files for masterjob', masterjob)
+    cmd = run(['gbbox', 'ps', '-As', f'-id={masterjob}'])
     cmd_out, *_ = cmd.communicate()
     jl = JobList(cmd_out)
-
-    jdl_archive_file = args.output or 'jdl-index.bz2'
 
     for pid in tqdm(jl.done()):
         ps_proc = run(['alien_ps', '-jdl', pid])
@@ -72,16 +80,13 @@ def main(argv=None):
         input_dirs = [Path(a.group(1)).parent
                       for a in re.finditer("LF:([^,]+)", m.group(1))]
 
-        # for input_subdir in tqdm(input_dirs, desc=pid):
         rmdir_proc = run(['alien_rmdir', *input_dirs])
         rmdir_proc.wait()
 
         kill_proc = run(['alien_kill', pid])
         kill_proc.wait()
-
-        # save_jdl_to_archive(jdl, jdl_archive_file)
-
-    return 0
+        if jdl_archive_file:
+            save_jdl_to_archive(jdl, jdl_archive_file)
 
 
 def save_jdl_to_archive(jdl, output):
