@@ -1,0 +1,130 @@
+---
+aliphysics-version: "vAN-20191025_ROOT6-1"
+max-input-files: 45
+max-merge-files: 15
+ttl: "24 * 60 * 60"
+
+tasks:
+  - macro: '$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C'
+  - macro: '$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C'
+  - macro: '$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C'
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "sys_eta_1", "",
+      "{0:5:10:20:30:40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.5;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=39; ~q3d_maxq=0.0975;"
+      "~do_sharequality_cf=true; ~do_detadphistar_cf=true;"
+      "@num_events_to_mix = 3;"
+      "~eventreader_dca_globaltrack = 0;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.6;"
+      "$pion_1_eta={-.9,.9};"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tof_limit=0.7;"
+      "$pion_1_kreject_sigma=3.0;"
+      "$pion_1_pt={0.15, 2.0};"
+      "$pair_delta_eta_min=0.009; $pair_delta_phi_min=0.024;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "sys_eta_2", "",
+      "{0:5:10:20:30:40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.5;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=39; ~q3d_maxq=0.0975;"
+      "~do_sharequality_cf=true; ~do_detadphistar_cf=true;"
+      "@num_events_to_mix = 3;"
+      "@enable_pair_monitors=false;"
+      "~eventreader_dca_globaltrack = 0;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.6;"
+      "$pion_1_eta={-.8,.8};"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tof_limit=0.7;"
+      "$pion_1_kreject_sigma=3.0;"
+      "$pion_1_pt={0.15, 2.0};"
+      "$pair_delta_eta_min=0.009; $pair_delta_phi_min=0.024;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "sys_eta_3", "",
+      "{0:5:10:20:30:40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.5;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=39; ~q3d_maxq=0.0975;"
+      "~do_sharequality_cf=true; ~do_detadphistar_cf=true;"
+      "@num_events_to_mix = 3;"
+      "~eventreader_dca_globaltrack = 0;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.6;"
+      "$pion_1_eta={-.7,.7};"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tof_limit=0.7;"
+      "$pion_1_kreject_sigma=3.0;"
+      "$pion_1_pt={0.15, 2.0};"
+      "$pair_delta_eta_min=0.009; $pair_delta_phi_min=0.024;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "sys_eta_4", "",
+      "{0:5:10:20:30:40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.5;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=39; ~q3d_maxq=0.0975;"
+      "~do_sharequality_cf=true; ~do_detadphistar_cf=true;"
+      "@num_events_to_mix = 3;"
+      "~eventreader_dca_globaltrack = 0;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.6;"
+      "$pion_1_eta={-.7,0.0};"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tof_limit=0.7;"
+      "$pion_1_kreject_sigma=3.0;"
+      "$pion_1_pt={0.15, 2.0};"
+      "$pair_delta_eta_min=0.009; $pair_delta_phi_min=0.024;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "sys_eta_5", "",
+      "{0:5:10:20:30:40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.5;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=39; ~q3d_maxq=0.0975;"
+      "~do_sharequality_cf=true; ~do_detadphistar_cf=true;"
+      "@num_events_to_mix = 3;"
+      "~eventreader_dca_globaltrack = 0;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.6;"
+      "$pion_1_eta={0.0,0.7};"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tof_limit=0.7;"
+      "$pion_1_kreject_sigma=3.0;"
+      "$pion_1_pt={0.15, 2.0};"
+      "$pair_delta_eta_min=0.009; $pair_delta_phi_min=0.024;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "sys_eta_6", "",
+      "{0:5:10:20:30:40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.5;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=39; ~q3d_maxq=0.0975;"
+      "~do_sharequality_cf=true; ~do_detadphistar_cf=true;"
+      "@num_events_to_mix = 3;"
+      "~eventreader_dca_globaltrack = 0;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.6;"
+      "$pion_1_eta={-0.035,0.035};"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tof_limit=0.7;"
+      "$pion_1_kreject_sigma=3.0;"
+      "$pion_1_pt={0.15, 2.0};"
+      "$pair_delta_eta_min=0.009; $pair_delta_phi_min=0.024;"
