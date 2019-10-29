@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+#
+# print-event-count
+#
+
+
+import sys
+from pathlib import Path
+
+
+def arg_parser():
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument('source',
+                        type=Path,
+                        help="File or directory to scan")
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+
+
+    if args.source.is_dir():
+        paths = args.source.glob("**/*.root")
+    else:
+        paths = [args.source]
+
+    for path in paths:
+        print('scanning',path)
+        scan_tfile(path)
+
+
+def scan_tfile(path):
+    from ROOT import TFile
+    from stumpy.utils import walk_matching
+
+    tfile = TFile.Open(str(path))
+    if not tfile:
+        return 
+
+    for path, tdir in walk_matching(tfile, "PWG2FEMTO/*/*_*_*_pip/Event/pass"):
+        parts = path.split("/")
+        container = parts[1]
+        analysis = parts[2]
+        p = analysis.split('_')
+        cent_mult = tdir.Get('cent_mult')
+        print(container, '-'.join(p[-3:-1]), '%8d' % int(cent_mult.GetEntries()))
+
+
+if __name__ == "__main__":
+    exit(main())
