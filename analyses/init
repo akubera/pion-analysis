@@ -8,6 +8,7 @@ import sys
 import json
 import yaml
 from pathlib import Path
+from shutil import copyfile
 
 
 def arg_parser():
@@ -59,6 +60,11 @@ def main(argv=None):
     local_workdir = __dir__ / "gridresults" / f'job-{tag}'
     local_workdir.mkdir(parents=True)
 
+    upload_files = []
+    for upload_file in map(Path, analysis['upload-files']):
+        upload_files.append((local_workdir / upload_file).absolute())
+        copyfile(upload_file, upload_files[-1])
+
     for i, (dset_name, runs) in enumerate(data['datasets'].items(), 1):
         hashname = production.get_hashname(runs)
 
@@ -74,6 +80,9 @@ def main(argv=None):
                        output_filename=result_filename)
 
         (dest_wrkdir / 'RunAnalysis.C').write_text(txt)
+
+        for upload_file in upload_files:
+            upload_file.link_to(dest_wrkdir / upload_file.name)
 
     (local_workdir / 'settings.json').write_text(json.dumps({'analysis': analysis, 'data': data}, indent=1))
 
