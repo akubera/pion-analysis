@@ -32,7 +32,7 @@ SetupGrid(AliAnalysisManager *mgr, TString gridmode)
   alien->SetSplitMaxInputFileNumber({{ analysis.get('max-input-files', 45) }});
   alien->SetMergeViaJDL(true);
   alien->SetTTL({{ TTL or 12 * 60 * 60 }});
-  alien->AddAdditionalLibrary("{{ ' '.join(upload_files or []) }}");
+  alien->AddAdditionalLibrary("{{ analysis.get('upload-files', []) | join(',') }}");
   alien->SetRunPrefix("{{ production.prefix or '000'}}");
 
   mgr->SetGridHandler(alien);
