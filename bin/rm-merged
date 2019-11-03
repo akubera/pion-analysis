@@ -7,6 +7,7 @@ import sys
 import re
 
 import os
+import logging
 from pprint import pprint
 import subprocess as sp
 from pathlib import Path
@@ -16,7 +17,6 @@ from zipfile import ZipFile, ZIP_BZIP2
 
 
 from tqdm import tqdm
-
 
 run = partial(sp.Popen, stdout=sp.PIPE, encoding='utf-8')
 
@@ -45,17 +45,23 @@ def main(argv=None):
     wh = sp.Popen(['/usr/bin/which', 'gbbox'], stdout=sp.PIPE)
     gbbox_exe, *_ = wh.communicate()
 
-    module = 'AliROOT/latest'
+    module = 'AliRoot/latest'
     if wh.returncode != 0:
-        print("Not in python environment... loading %s" % module, end=' ')
-        module_dir = os.path.expandvars('$ALIBUILD_WORK_DIR/MODULES/ubuntu1804_x86-64')
+        ali_work = os.environ.get("ALIBUILD_WORK_DIR", "$HOME/alice/sw")
+        ali_arch = os.environ.get("ALIBUILD_ARCHITECTURE", "ubuntu1904_x86-64")
+        module_dir = os.path.expandvars(f'{ali_work}/MODULES/{ali_arch}')
+
+        logging.warning("Not in python environment; attempting to load %s from %s", module, module_dir)
 
         os.environ['MODULEPATH'] = ':'.join([module_dir, *os.environ.get('MODULEPATH', '').split(':')])
-        cmd = run(['modulecmd', 'python', 'load', module])
+        cmd = run(['modulecmd', 'python', 'load', module], stderr=sp.DEVNULL)
         cmd_out, *_ = cmd.communicate()
         exec(cmd_out)
 
-    jdl_archive_file = args.output or 'jdl-index.bz2'
+        wh = sp.Popen(['/usr/bin/which', 'gbbox'], stdout=sp.PIPE)
+        if wh.wait() > 0:
+            print("failed to load modules")
+            return 1
 
     for masterjob in args.masterjob:
         remove_sources_files(masterjob)
@@ -178,4 +184,5 @@ class JobList:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.ERROR)
     exit(main())
