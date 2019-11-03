@@ -1,16 +1,25 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # kill-done-jobs
 #
 
 
+import os
+import re
 import sys
+import logging
+import subprocess as sp
+from time import sleep
+from pathlib import Path
+from functools import partial
+
+run_cmd = partial(sp.Popen, stdout=sp.PIPE, encoding='utf-8')
 
 
 def arg_parser():
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('masterjob',
+    parser.add_argument('masterjobs',
                         nargs='*',
                         help='Only scan these masterjobs')
     return parser
@@ -21,11 +30,71 @@ def main(argv=None):
         argv = sys.argv[1:]
     args = arg_parser().parse_args(argv)
 
-    from alimaster import env
+    # from alimaster import env
+    env = os.environ.copy()
 
-    print('ok')
+    gbbox = get_aliroot_exec('gbbox')
+
+    if args.masterjobs:
+        masterjobs = args.masterjobs
+    else:
+        gbbox_ps = run_cmd([gbbox, 'ps'])
+
+        name = 'akubera'
+        regex = re.compile(rf'^{name} *(?P<pid>[0-9]+) *(?P<status>\w+) *(?P<script>.+)$', flags=re.M)
+        ps_stdout, _ = gbbox_ps.communicate()
+        assert gbbox_ps.returncode == 1, 'Could not call `gbbox ps`'
+
+        if isinstance(ps_stdout, bytes):
+            ps_stdout = ps_stdout.decode()
+
+        masterjobs = [m.group('pid')
+                      for m in regex.finditer(ps_stdout)
+                      if Path(m.group('script')).name == 'analysis.sh']
+
+    for masterjob in masterjobs:
+        print("Killing finished jobs in", masterjob, end=' ', flush=True)
+
+        kill_cmd = [gbbox, 'masterJob', masterjob, '-status', 'DONE', 'kill']
+        kill_job = run_cmd(kill_cmd, stderr=sp.PIPE, stdin=sp.DEVNULL)
+        out, err = kill_job.communicate()
+
+        if kill_job.returncode == os.EX_OK:
+            print('done')
+        else:
+            print('error:', kill_job.returncode)
+            print(err)
+
+        sleep(0.297)
+
+    return 0
+
+
+def get_aliroot_exec(name):
+    find_exe = run_cmd(['/usr/bin/which', name])
+
+    if find_exe.wait() != 0:
+        module = 'AliRoot/latest'
+        ali_work = os.environ.get("ALIBUILD_WORK_DIR", "$HOME/alice/sw")
+        ali_arch = os.environ.get("ALIBUILD_ARCHITECTURE", "ubuntu1904_x86-64")
+        module_dir = os.path.expandvars(f'{ali_work}/MODULES/{ali_arch}')
+
+        logging.warning("Not in python environment; attempting to load %s from %s", module, module_dir)
+
+        os.environ['MODULEPATH'] = ':'.join([module_dir, *os.environ.get('MODULEPATH', '').split(':')])
+        cmd = run_cmd(['modulecmd', 'python', 'load', module], stderr=sp.DEVNULL)
+        cmd_out, *_ = cmd.communicate()
+        exec(cmd_out)
+
+        find_exe = run_cmd(['/usr/bin/which', name])
+        if find_exe.wait() != 0:
+            logging.fatal("Could not load AliRoot environment")
+            raise SystemExit
+
+    exe = find_exe.stdout.read().strip()
+    return exe
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.ERROR)
     exit(main())
-
