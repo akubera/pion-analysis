@@ -25,6 +25,12 @@ def argparser():
     parser.add_argument("-o", "--output",
                         default=None,
                         help="Output file")
+    parser.add_argument("--stages",
+                        action='store_true',
+                        help='Scan stage directories')
+    parser.add_argument("-n", "--dry-run",
+                        action='store_true',
+                        help="Don't submit grid changes")
     parser.add_argument("--ignore",
                         action='store_true',
                         help='this option is ignored')
@@ -39,13 +45,20 @@ def main(argv=None):
 
     from ROOT import TGrid
 
+    grid_path = args.grid_path
+
+    # lookup masterjob id
+    if re.match(r'\d{10}', grid_path):
+        out = sp.check_output(f"gbbox ps -A -id {grid_path}", shell=True).strip().decode()
+        grid_path = Path(out.rpartition(' ')[2]).parent.name
+
     grid = TGrid.Connect("alien://")
-    grid_path = Path(grid.GetHomeDirectory()) / args.grid_path / 'output'
+    grid_path = Path(grid.GetHomeDirectory()) / grid_path / 'output'
 
     print('Moving unmerged ROOT files found in', grid_path)
 
-    if not args.yes:
-        user_res = input("Are you sure all remaing ROOT files "
+    if args.stages and not args.yes:
+        user_res = input("Are you sure *ALL* remaing ROOT files "
                          "are independent? ")
         if user_res.lower() not in ("y", "yes"):
             return 1
@@ -53,11 +66,11 @@ def main(argv=None):
     stagexmls_query = grid.Query(str(grid_path), "Stage_*.xml", "", "")
     stage_xmls = [Path(str(s.GetValue('lfn'))) for s in stagexmls_query]
 
-    max_stage = len(stage_xmls)
-    assert stage_xmls[-1].name == 'Stage_%d.xml' % max_stage
-    print('Moving remaining files to stage %d' % max_stage)
+    current_merge_stage = len(stage_xmls)
+    assert stage_xmls[-1].name == 'Stage_%d.xml' % current_merge_stage
+    print('Moving remaining files to stage %d' % current_merge_stage)
 
-    dest_root = grid_path / f'Stage_{max_stage}'
+    dest_root = grid_path / f'Stage_{current_merge_stage}'
 
     try:
         sp.check_call(['alien_ls', dest_root], stdout=sp.PIPE)
@@ -65,45 +78,67 @@ def main(argv=None):
         print(f"Missing destination directory {dest_root.name}", file=sys.stderr)
         return 1
 
-    root_query = grid.Query(str(grid_path), "*.root", "", "")
-    root_file_paths = [p
-                       for p in (Path(str(s.GetValue('lfn'))).parent for s in root_query)
-                       if p.parent != dest_root]
+    grid_query = grid.Query(str(grid_path), "*.root", "", "")
+    rootfile_query_paths = [Path(str(s.GetValue('lfn'))) for s in grid_query]
+    query_dir_paths = [p.parent for p in rootfile_query_paths]
 
-    root_file_relpaths = [p.relative_to(grid_path) for p in root_file_paths]
+    dir_paths = {p for p in query_dir_paths if p.parent != dest_root}
 
-    dests = []
-    for relpath in root_file_relpaths:
+    if current_merge_stage == 1:
+        # assume none are new
+        new_dir_paths = {}
+        old_dir_paths = dir_paths
+    else:
+        old_dir_paths = {p for p in dir_paths if 'Stage' in str(p)}
+        new_dir_paths = dir_paths - old_dir_paths
 
-        if not relpath.parts:
-            print("Could not load Stage directory")
-            return 1
-
-        m = re.match(r'Stage_(\d+)', relpath.parts[0])
-        if not m:
-            dest = 'X%s' % relpath.parts[0]
-        else:
-            idx = int(m.group(1))
-            assert idx != max_stage
-            dest = 'X%ss%02d' % (relpath.parts[1], idx)
-        dests.append(dest_root / dest)
-
-    # for src, dest in tqdm(list(zip(root_file_paths, dests))):
-    src_dest_pairs = list(zip(root_file_paths, dests))
-    for src, dest in src_dest_pairs:
-        print(src, '->', dest)
-        grid.Mkdir(str(dest))
-        # mv_cmd = run(['alien_mv', f'{src}/*', f'{dest}/'], stderr=sp.DEVNULL)
+    def alien_mv(src, dest):
+        if args.dry_run:
+            return
+        src, dest = map(str, (src, dest))
+        grid.Mkdir(dest)
         mv_cmd = run(['alien_mv', f'{src}/*', f'{dest}/'])
         mv_stdout, mv_stderr = mv_cmd.communicate()
-
         if mv_stderr:
-            # grid.Rmdir(str(dest))
             print("Move command failed")
+            print(" -- stdout --")
             print(mv_stdout)
+            print(" -- stderr --")
             print(mv_stderr)
+            answer = input("Remove destination directory? ")
+            if answer.lower() in ("y", "yes"):
+                grid.Rmdir(dest)
             return 1
-        grid.Rmdir(str(src))
+        grid.Rmdir(src)
+
+    MOVE_PREFIX = 'X'
+    STAGEMOVE_PREFIX = 'S'
+
+    for path in new_dir_paths:
+        relpath = path.relative_to(grid_path)
+        dest = dest_root / f'{MOVE_PREFIX}{relpath.parts[0]}'
+        print(path, '->', dest)
+        alien_mv(path, dest)
+
+    if not args.stages:
+        return 0
+
+    if old_dir_paths and not args.yes:
+        answer = input(f"Are you sure you want to move {len(old_dir_paths)} "
+                        "to new stage dir? ")
+        if answer.lower() not in ('y', 'yes'):
+            return
+
+    for path in old_dir_paths:
+        if path.name.startswith(MOVE_PREFIX) or path.name.startswith(STAGEMOVE_PREFIX):
+            dest = dest_root / path.name
+        else:
+            stage, num = path.parent.name.split('_')
+            assert stage == 'Stage'
+            dest = dest_root / f'{STAGEMOVE_PREFIX}{num}_{path.name}'
+
+        print(path, ' ->', dest)
+        alien_mv(path, dest)
 
     return 0
 
