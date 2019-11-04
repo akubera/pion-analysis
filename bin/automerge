@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+#
+# automerge
+#
+
+import re
+import sys
+import json
+from glob import glob
+from os import chdir, environ
+import subprocess as sp
+from pathlib import Path
+from pprint import pprint
+
+
+def arg_parser():
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("masterjob",
+                        nargs='+',
+			help='masterjobs to merge')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+    masterjobs = set(args.masterjob)
+
+    gbbox_outputs = [sp.check_output(f"gbbox ps -A -id {jid}", shell=True)
+                     for jid in masterjobs]
+
+    paths = [Path(out.rstrip().rpartition(b' ')[2].decode())
+             for out in gbbox_outputs]
+
+    analysis_path = Path(environ.get("FEMTOANALYSIS_PATH", "analyses"))
+
+    from collections import defaultdict
+    file_paths = defaultdict(list)
+
+    for path, masterjob in zip(paths, masterjobs):
+        job_name = path.parent.name
+        job_code, _, job_id = job_name.rpartition('-')
+
+        files = list(analysis_path.rglob(job_code))
+        if len(files) == 0:
+            print(f"Could not find an analysis directory for {job_name} "
+                   "(masterjob {masterjob})")
+            continue
+        elif len(files) > 1:
+            print(f"Found multiple analyses for {job_name} (masterjob {masterjob})")
+            pprint(files)
+            continue
+
+        file_paths[(files[0], job_id)].append(masterjob)
+
+    for (analysis_path, job_id), mjids in file_paths.items():
+        with (analysis_path / 'settings.json').open() as f:
+            settings = json.load(f)
+
+        # assume ordered properly
+        job_idx = int(job_id) - 1
+        subset_name = list(settings['data']['datasets'].keys())[job_idx]
+        subset_path = (analysis_path / subset_name).absolute()
+        if not (subset_path / 'analysis.root').exists():
+            print("No analysis.root found. Wrong analysis directory.",
+                  file=sys.stderr)
+            continue
+
+        working_dir = f"{analysis_path.name}-{job_id}"
+        run_macro = (subset_path / 'RunAnalysis.C').read_text()
+        if working_dir not in run_macro:
+            print("Did not find job working dir in RunAnalysis macro; "
+                  "probably out-of-order analyses. Skipping.",
+                  file=sys.stderr)
+            continue
+
+        chdir(subset_path)
+        args = ['aliroot', '-q', 'RunAnalysis.C', 'merge']
+        print(f"Running merge in {subset_path}")
+        aliroot_proc = sp.Popen(args, stdout=sp.PIPE, stderr=sp.PIPE, encoding='utf-8')
+        stdout, stderr = aliroot_proc.communicate()
+
+        if 'Final merged results found. Not merging again.' in stdout:
+            print(f"Already submitted final merge for {working_dir}")
+            print(subset_path)
+            continue
+
+        m = re.search(r"Job id: '(?P<jid>\d+)'", stdout, re.M)
+        if m:
+            print("Merging", subset_path, "in masterjob:", m.group('jid'))
+        else:
+            print(aliroot_proc.returncode)
+            print(f"Something went wrong processing {working_dir}, "
+                  f"from masterjob {' &'.join(mjids)}")
+            print(" -- stdout -- ")
+            print(stdout)
+            print(" -- stderr -- ")
+            print(stderr)
+
+
+if __name__ == "__main__":
+    exit(main())
