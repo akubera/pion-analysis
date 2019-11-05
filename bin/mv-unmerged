@@ -31,6 +31,9 @@ def argparser():
     parser.add_argument("-n", "--dry-run",
                         action='store_true',
                         help="Don't submit grid changes")
+    parser.add_argument("--stage",
+                        type=int,
+                        help='Force merge stage')
     parser.add_argument("--ignore",
                         action='store_true',
                         help='this option is ignored')
@@ -63,11 +66,16 @@ def main(argv=None):
         if user_res.lower() not in ("y", "yes"):
             return 1
 
-    stagexmls_query = grid.Query(str(grid_path), "Stage_*.xml", "", "")
-    stage_xmls = [Path(str(s.GetValue('lfn'))) for s in stagexmls_query]
+    if args.stage is not None:
+        current_merge_stage = args.stage
+    else:
+        stagexmls_query = grid.Query(str(grid_path), "Stage_*.xml", "", "")
+        stage_xmls = [Path(str(s.GetValue('lfn'))) for s in stagexmls_query]
 
-    current_merge_stage = len(stage_xmls)
-    assert stage_xmls[-1].name == 'Stage_%d.xml' % current_merge_stage
+        current_merge_stage = len(stage_xmls)
+        assert stage_xmls[-1].name == 'Stage_%d.xml' % current_merge_stage
+        del stagexmls_query, stage_xmls
+
     print('Moving remaining files to stage %d' % current_merge_stage)
 
     dest_root = grid_path / f'Stage_{current_merge_stage}'
