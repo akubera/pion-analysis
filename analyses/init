@@ -18,6 +18,8 @@ def arg_parser():
                         default='data.yaml')
     parser.add_argument('--analysis',
                         default='analysis.yaml')
+    parser.add_argument('--tag',
+                        help='Manually set the job tag (will be prefixed with job-)')
     parser.add_argument('--local',
                         action='store_true',
                         help='Initialize local analysis')
@@ -55,13 +57,13 @@ def main(argv=None):
     grid = TGrid.Connect("alien://")
 
     from datetime import datetime
-    tag = f'{datetime.now():%y%m%d%H%M%S}'
+    tag = args.tag or f'{datetime.now():%y%m%d%H%M%S}'
 
     local_workdir = __dir__ / "gridresults" / f'job-{tag}'
     local_workdir.mkdir(parents=True)
 
     upload_files = []
-    for upload_file in map(Path, analysis['upload-files']):
+    for upload_file in map(Path, analysis.get('upload-files', [])):
         upload_files.append((local_workdir / upload_file).absolute())
         copyfile(upload_file, upload_files[-1])
 
