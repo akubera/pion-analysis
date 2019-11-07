@@ -47,6 +47,7 @@ def main(argv=None):
     args = argparser().parse_args(argv)
 
     from ROOT import TGrid
+    from cppyy.gbl import nullptr
 
     grid_path = args.grid_path
 
@@ -56,6 +57,10 @@ def main(argv=None):
         grid_path = Path(out.rpartition(' ')[2]).parent.name
 
     grid = TGrid.Connect("alien://")
+    if grid == nullptr or not grid.IsConnected() or grid.GetHomeDirectory() == '/':
+        print("Could not connect to grid", file=sys.stderr)
+        return 1
+
     grid_path = Path(grid.GetHomeDirectory()) / grid_path / 'output'
 
     print('Moving unmerged ROOT files found in', grid_path)
@@ -128,7 +133,7 @@ def main(argv=None):
         print(path, '->', dest)
         alien_mv(path, dest)
 
-    if not args.stages:
+    if current_merge_stage != 1 and not args.stages:
         return 0
 
     if old_dir_paths and not args.yes:
@@ -138,7 +143,9 @@ def main(argv=None):
             return
 
     for path in old_dir_paths:
-        if path.name.startswith(MOVE_PREFIX) or path.name.startswith(STAGEMOVE_PREFIX):
+        if current_merge_stage == 1:
+            dest = dest_root / f'{MOVE_PREFIX}{path.name}'
+        elif path.name.startswith(MOVE_PREFIX) or path.name.startswith(STAGEMOVE_PREFIX):
             dest = dest_root / path.name
         else:
             stage, num = path.parent.name.split('_')
