@@ -13,20 +13,21 @@ _analysis_dir = _notebook_dir.parent
 
 # locate FemtoFitter & insert into sys.path
 _ff_path = _analysis_dir / 'femtofitter'
-_ff_path = environ.get('FEMTOFITTER_PATH', _ff_path)
+_ff_path = Path(environ.get('FEMTOFITTER_PATH', _ff_path))
 
 if _ff_path.exists() and str(_ff_path) not in sys.path:
     sys.path.insert(0, str(_ff_path))
 
 # Add femtofitter build path into LD_LIBRARY_PATH
 _libpath = environ.get("LD_LIBRARY_PATH", "").split(':')
-_libpath.insert(0, _ff_path / 'build')
+_libpath.insert(0, str(_ff_path / 'build'))
 
 environ['LD_LIBRARY_PATH'] = ':'.join(map(str, _libpath))
 
 # Python libraries
 import numpy as np
 import pandas as pd
+import networkx as nx
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -39,12 +40,27 @@ import scipy
 from scipy.interpolate import interp1d, CubicSpline
 import statistics
 from statistics import mean
+from collections import defaultdict, Counter
+
+
+try:
+    import ROOT
+except ImportError:
+    import subprocess as _sp
+    environ['MODULEPATH'] = '$HOME/alice/sw/MODULES/$ALIBUILD_ARCHITECTURE'
+    alice_env = 'AliPhysics/latest-k614-user-root6-cpp14'
+    _env_load = _sp.check_output(['modulecmd', 'python', 'load', alice_env],
+                                 encoding='utf-8',
+                                 stderr=_sp.DEVNULL)
+    exec(_env_load)
+    sys.path = environ['PYTHONPATH'].split(':') + sys.path
+    import ROOT
+
 
 import femtofitter
 from femtofitter import FitResults, PathQuery
 
 # ROOT classes
-import ROOT
 from ROOT import gROOT, gSystem, gInterpreter, gPad, gStyle, gDirectory
 from ROOT import TCanvas, TPad
 from ROOT import TFile
@@ -76,4 +92,3 @@ from ROOT import (
 
 # move out of notebook directory
 os.chdir(_analysis_dir)
-
