@@ -8,6 +8,7 @@ import sys
 import json
 from glob import glob
 from os import chdir, environ
+from collections import defaultdict
 import subprocess as sp
 from pathlib import Path
 from pprint import pprint
@@ -21,7 +22,7 @@ def arg_parser():
                         help='Do not submit job')
     parser.add_argument("masterjob",
                         nargs='+',
-			help='masterjobs to merge')
+                        help='masterjobs to merge')
     return parser
 
 
@@ -31,16 +32,29 @@ def main(argv=None):
     args = arg_parser().parse_args(argv)
     masterjobs = set(args.masterjob)
 
-    gbbox_outputs = [sp.check_output(f"gbbox ps -A -id {jid}", shell=True)
-                     for jid in masterjobs]
+    file_paths = defaultdict(list)
 
-    paths = [Path(out.rstrip().rpartition(b' ')[2].decode())
-             for out in gbbox_outputs]
+    paths = []
+    for jid in masterjobs:
+        if re.match(r"\d{9,}", jid):
+            try:
+                ps_data = sp.check_output(f"gbbox ps -A -id {jid}",
+                                          stderr=sp.DEVNULL,
+                                          shell=True)
+            except sp.CalledProcessError:
+                ps_data = None
+                print(f"Could not find process {jid}", file=sys.stderr)
+                return 1
+
+            if not ps_data:
+                print(f"No result for {jid}, is token enabled?", file=sys.stderr)
+                return 1
+
+            paths.append(Path(ps_data.rstrip().rpartition(b' ')[2].decode()))
+        else:
+            paths.append(Path(jid) / 'analysis.sh')
 
     analysis_path = Path(environ.get("FEMTOANALYSIS_PATH", "analyses"))
-
-    from collections import defaultdict
-    file_paths = defaultdict(list)
 
     for path, masterjob in zip(paths, masterjobs):
         job_name = path.parent.name
@@ -52,15 +66,20 @@ def main(argv=None):
                    "(masterjob {masterjob})")
             continue
         elif len(files) > 1:
-            print(f"Found multiple analyses for {job_name} (masterjob {masterjob})")
-            pprint(files)
+            print(f"Found multiple analyses for {job_name!r} (masterjob {masterjob})")
             continue
 
-        file_paths[(files[0], job_id)].append(masterjob)
+        file_paths[(files[0].absolute(), job_id)].append(masterjob)
+
+    settings_cache = {}
 
     for (analysis_path, job_id), mjids in file_paths.items():
-        with (analysis_path / 'settings.json').open() as f:
-            settings = json.load(f)
+
+        if analysis_path not in settings_cache:
+            with (analysis_path / 'settings.json').open() as f:
+                settings_cache[analysis_path] = json.load(f)
+
+        settings = settings_cache[analysis_path]
 
         # assume ordered properly
         job_idx = int(job_id) - 1
