@@ -16,6 +16,9 @@ from pprint import pprint
 def arg_parser():
     from argparse import ArgumentParser
     parser = ArgumentParser()
+    parser.add_argument("-n", "--dry-run",
+                        action='store_true',
+                        help='Do not submit job')
     parser.add_argument("masterjob",
                         nargs='+',
 			help='masterjobs to merge')
@@ -77,9 +80,13 @@ def main(argv=None):
             continue
 
         chdir(subset_path)
-        args = ['aliroot', '-q', 'RunAnalysis.C', 'merge']
+        if args.dry_run:
+            print(f"Not submitting merge job in {working_dir} (dry run)")
+            continue
+
         print(f"Running merge in {subset_path}")
-        aliroot_proc = sp.Popen(args, stdout=sp.PIPE, stderr=sp.PIPE, encoding='utf-8')
+        merge_args = ['aliroot', '-q', 'RunAnalysis.C', 'merge']
+        aliroot_proc = sp.Popen(merge_args, stdout=sp.PIPE, stderr=sp.PIPE, encoding='utf-8')
         stdout, stderr = aliroot_proc.communicate()
 
         if 'Final merged results found. Not merging again.' in stdout:
