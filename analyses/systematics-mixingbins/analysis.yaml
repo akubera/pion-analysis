@@ -1,6 +1,6 @@
 ---
 aliphysics-version: "vAN-20191031_ROOT6-1"
-max-input-files: 40
+max-input-files: 35
 max-merge-files: 18
 ttl: "24 * 60 * 60"
 
@@ -11,7 +11,7 @@ tasks:
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
       "analysis_1vtx", "",
-      "{0:5,20:30,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
       "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
@@ -28,7 +28,7 @@ tasks:
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
       "analysis_3vtx", "",
-      "{0:5,20:30,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
       "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
@@ -45,7 +45,7 @@ tasks:
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
       "analysis_posvtx", "",
-      "{0:5,20:30,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
       "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
@@ -63,7 +63,7 @@ tasks:
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
       "analysis_negvtx", "",
-      "{0:5,20:30,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
       "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
@@ -81,7 +81,7 @@ tasks:
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
       "analysis_midvtx", "",
-      "{0:5,20:30,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
       "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
