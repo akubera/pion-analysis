@@ -1,5 +1,5 @@
 ---
-aliphysics-version: "vAN-20191031_ROOT6-1"
+aliphysics-version: "vAN-20191108_ROOT6-1"
 max-input-files: 35
 max-merge-files: 18
 ttl: "24 * 60 * 60"
@@ -10,88 +10,105 @@ tasks:
   - macro: '$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C'
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
-      "analysis_1vtx", "",
-      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
-      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
-      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
-      "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
-      "@num_events_to_mix=3;"
-      "@vertex_bins=1; "
-      "~eventreader_dca_globaltrack = 0;"
-      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
-      "$pion_1_sigma=2.0;"
-      "$pion_1_tof_limit=0.75;"
-      "$pion_1_min_tpc_chi_ndof=0.33;"
-      "$pion_1_max_tpc_chi_ndof=1.8;"
-      "$pion_1_max_its_chi_ndof=1.8;"
-
-  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
-    args: |
-      "analysis_3vtx", "",
-      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "analysis_1mlt", "",
+      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
       "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
       "@num_events_to_mix=3;"
       "@vertex_bins=3; "
+      "@mult_bins=30; "
       "~eventreader_dca_globaltrack = 0;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_sigma=2.0;"
-      "$pion_1_tof_limit=0.75;"
+      "$pion_1_kreject_sigma=3.2;"
+      "$pion_1_tof_limit=0.60;"
+      "$pion_1_preject_sigma=3.2;"
+      "$pion_1_tof_p_momentum_limit=0.60;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
-      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=2.5;"
 
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
-      "analysis_posvtx", "",
-      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "analysis_2mlt", "",
+      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
       "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
       "@num_events_to_mix=3;"
-      "@vertex_bins=2; "
-      "@vertex_min=0; @vertex_max=10; "
+      "@vertex_bins=3; "
+      "@mult_bins=45; "
       "~eventreader_dca_globaltrack = 0;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_sigma=2.0;"
-      "$pion_1_tof_limit=0.75;"
+      "$pion_1_kreject_sigma=3.2;"
+      "$pion_1_tof_limit=0.60;"
+      "$pion_1_preject_sigma=3.2;"
+      "$pion_1_tof_p_momentum_limit=0.60;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
-      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=2.5;"
 
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
-      "analysis_negvtx", "",
-      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "analysis_3mlt", "",
+      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
       "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
       "@num_events_to_mix=3;"
-      "@vertex_bins=2; "
-      "@vertex_min=-10; @vertex_max=0; "
+      "@vertex_bins=3; "
+      "@mult_bins=60; "
       "~eventreader_dca_globaltrack = 0;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_sigma=2.0;"
-      "$pion_1_tof_limit=0.75;"
+      "$pion_1_kreject_sigma=3.2;"
+      "$pion_1_tof_limit=0.60;"
+      "$pion_1_preject_sigma=3.2;"
+      "$pion_1_tof_p_momentum_limit=0.60;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
-      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=2.5;"
 
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
-      "analysis_midvtx", "",
-      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0);"
+      "analysis_4mlt", "",
+      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
       "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
       "@num_events_to_mix=3;"
-      "@vertex_bins=2; "
-      "@vertex_min=-5.0; @vertex_max=5.0; "
+      "@vertex_bins=3; "
+      "@mult_bins=10; "
       "~eventreader_dca_globaltrack = 0;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_sigma=2.0;"
-      "$pion_1_tof_limit=0.75;"
+      "$pion_1_kreject_sigma=3.2;"
+      "$pion_1_tof_limit=0.60;"
+      "$pion_1_preject_sigma=3.2;"
+      "$pion_1_tof_p_momentum_limit=0.60;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
-      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=2.5;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "analysis_5mlt", "",
+      "{5:10:20,30:40}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
+      "~do_sharequality_cf=true; ~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
+      "@num_events_to_mix=3;"
+      "@vertex_bins=3; "
+      "@mult_bins=20; "
+      "~eventreader_dca_globaltrack = 0;"
+      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
+      "$pion_1_sigma=2.0;"
+      "$pion_1_kreject_sigma=3.2;"
+      "$pion_1_tof_limit=0.60;"
+      "$pion_1_preject_sigma=3.2;"
+      "$pion_1_tof_p_momentum_limit=0.60;"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=2.5;"
