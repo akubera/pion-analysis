@@ -28,6 +28,9 @@ def argparser():
     parser.add_argument("--stages",
                         action='store_true',
                         help='Scan stage directories')
+    parser.add_argument("--copy",
+                        action='store_true',
+                        help='Copy instead of move')
     parser.add_argument("-n", "--dry-run",
                         action='store_true',
                         help="Don't submit grid changes")
@@ -124,6 +127,31 @@ def main(argv=None):
             return 1
         grid.Rmdir(src)
 
+    def alien_cp(src, dest):
+        if args.dry_run:
+            return
+        src, dest = map(str, (src, dest))
+        grid.Mkdir(dest)
+
+        cp_cmd = run(['alien_cp',
+                      f'alien:/{src}/root_archive.zip',
+                      f'alien:/{dest}/'])
+
+        cp_stdout, cp_stderr = cp_cmd.communicate()
+        if cp_stderr:
+            print("Copy command failed")
+            print(" -- stdout --")
+            print(cp_stdout)
+            print(" -- stderr --")
+            print(cp_stderr)
+            answer = input("Remove destination directory? ")
+            if answer.lower() in ("y", "yes"):
+                grid.Rmdir(dest)
+            return 1
+        answer = input("Remove destination directory? ")
+        if answer.lower() in ("y", "yes"):
+            grid.Rmdir(src)
+
     MOVE_PREFIX = 'X'
     STAGEMOVE_PREFIX = 'S'
 
@@ -153,7 +181,10 @@ def main(argv=None):
             dest = dest_root / f'{STAGEMOVE_PREFIX}{num}_{path.name}'
 
         print(path, ' ->', dest)
-        alien_mv(path, dest)
+        if args.copy:
+            alien_cp(path, dest)
+        else:
+            alien_mv(path, dest)
 
     return 0
 
