@@ -30,6 +30,7 @@ import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tqdm.notebook import tqdm
 
 from itertools import chain, repeat, cycle, islice, product
 from functools import partial, reduce
@@ -92,3 +93,23 @@ from ROOT import (
 
 # move out of notebook directory
 os.chdir(_analysis_dir)
+
+
+# Setup ROOT Styles
+gStyle.SetOptStat(0)
+gStyle.SetCanvasDefW(1500)
+gStyle.SetCanvasDefH(900)
+
+for _ax in 'XYZT':
+    gStyle.SetTitleSize(0.06, _ax)
+    gStyle.SetLabelSize(0.04, _ax)
+
+for _ax, _offset in (('X', 1.5), ('Y', 1.1), ('Z', 1.3)):
+    gStyle.SetTitleOffset(_offset, _ax)
+
+gStyle.SetPadTopMargin(0.13)
+gStyle.SetPadBottomMargin(0.25)
+gStyle.SetPadLeftMargin(0.17)
+gStyle.SetPadRightMargin(0.25)
+
+gROOT.ForceStyle()
