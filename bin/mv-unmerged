@@ -94,11 +94,13 @@ def main(argv=None):
         print(f"Missing destination directory {dest_root.name}", file=sys.stderr)
         return 1
 
-    grid_query = grid.Query(str(grid_path), "*.root", "", "")
-    rootfile_query_paths = [Path(str(s.GetValue('lfn'))) for s in grid_query]
-    query_dir_paths = [p.parent for p in rootfile_query_paths]
+    def load_dir_paths(grid_path):
+        grid_query = grid.Query(str(grid_path), "root_archive.zip", "", "")
+        rootfile_query_paths = [Path(str(s.GetValue('lfn'))) for s in grid_query]
+        query_dir_paths = [p.parent for p in rootfile_query_paths]
+        return {p for p in query_dir_paths if p.parent != dest_root}
 
-    dir_paths = {p for p in query_dir_paths if p.parent != dest_root}
+    dir_paths = load_dir_paths(grid_path)
 
     if current_merge_stage == 1:
         # assume none are new
