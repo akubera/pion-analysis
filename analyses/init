@@ -52,6 +52,9 @@ def main(argv=None):
         'analysis': analysis,
     }
 
+    if args.local:
+        raise NotImplementedError
+
     from ROOT import TGrid
 
     grid = TGrid.Connect("alien://")
