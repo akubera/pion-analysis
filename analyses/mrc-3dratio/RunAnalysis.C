@@ -105,21 +105,46 @@ AddTasks()
 
   gROOT->ProcessLine(R""(
     AddNuTaskPionPionRoot6(
-      "mrcvary_fb128_1",
+      "true_pions",
       "macro='%%/ConfigNuFemtoAnalysisR6.C+'",
       R"(
-         +m; {0:90}; (0.2:0.3:0.4,0.6:0.7,0.8:1.0);
-         ~do_kt_trueq3d_cf = true; ~do_trueqinv_cf = true; ~do_kt_trueqinv_cf = true;
-         ~do_sharequality_cf=true; ~q3d_bin_count=39; ~q3d_maxq=0.117;
+         +m; {0:90}; (0.2:0.3,0.6:0.7,0.8:1.0);
+         ~do_kt_trueq3d_cf = false; ~do_trueqinv_cf = false; ~do_kt_trueqinv_cf = true;
+         ~do_sharequality_cf=false; ~q3d_bin_count=39; ~q3d_maxq=0.117;
          ~mcwg_lednicky = true; ~mcwg_strong = false; ~mcwg_3body = false;
-         ~eventreader_filter_bit=128;  ~eventreader_multibit=true;  ~eventreader_read_full_mc=true;
+         ~eventreader_filter_bit=128;  ~eventreader_multibit=true;  ~eventreader_read_full_mc=false;
        ~eventreader_dca_globaltrack = 0;
         $pion_1_max_impact_xy = 2.0;
         $pion_1_max_impact_z = 2.0;
-         @is_mc_analysis = true; ~trueq3d_extra_bins = true; @num_events_to_mix = 4;
-         @enable_pair_monitors=false;  $mc_pion_only=true; $pair_delta_eta_min = 0.01;
-         $pair_delta_phi_min = 0.03; $pion_1_rm_neg_lbl = false; $pion_1_sigma = 3.0;
+         @is_mc_analysis = true; ~trueq3d_extra_bins = true; @num_events_to_mix = 1;
+         @enable_pair_monitors=false;  $mc_pion_only=true;
+         $pion_1_ideal_pid=211;
+         $pair_delta_eta_min = 0.01; $pair_delta_phi_min = 0.03;
+         $pion_1_rm_neg_lbl = false; $pion_1_sigma = 3.0;
          $pion_1_min_tpc_chi_ndof = 0.33; )"); )"");
+
+  gROOT->ProcessLine(R""(
+    AddNuTaskPionPionRoot6(
+      "true_kaons",
+      "macro='%%/ConfigNuFemtoAnalysisR6.C+'",
+      R"(
+         +m; {0:90}; (0.2:0.3,0.6:0.7,0.8:1.0);
+         ~do_kt_trueq3d_cf = false; ~do_trueqinv_cf = false; ~do_kt_trueqinv_cf = true;
+         ~do_sharequality_cf=false; ~q3d_bin_count=39; ~q3d_maxq=0.117;
+         ~mcwg_lednicky = true; ~mcwg_strong = false; ~mcwg_3body = false;
+         ~eventreader_filter_bit=128;  ~eventreader_multibit=true;  ~eventreader_read_full_mc=false;
+       ~eventreader_dca_globaltrack = 0;
+        $pion_1_max_impact_xy = 2.0;
+        $pion_1_max_impact_z = 2.0;
+         @is_mc_analysis = true; ~trueq3d_extra_bins = true; @num_events_to_mix = 1;
+         @enable_pair_monitors=false;  $mc_pion_only=true;
+         $pion_1_ideal_pid=321;
+         $pair_delta_eta_min = 0.01; $pair_delta_phi_min = 0.03;
+         $pion_1_rm_neg_lbl = false; $pion_1_sigma = 3.0;
+         $pion_1_min_tpc_chi_ndof = 0.33; )"); )"");
+
+
+  return;
 
   gROOT->ProcessLine(R""(
   AddNuTaskPionPionRoot6(
@@ -162,7 +187,7 @@ RunLocal(TString wd)
   TStopwatch timer;
   timer.Start();
 
-  auto *mgr = NewAnalysisManagerExec();
+  auto *mgr = NewLocalAnalysisManager();
 
   const TString
     timestamp = wd(wd.Index('-')+1, 14),
@@ -181,8 +206,11 @@ RunLocal(TString wd)
   mgr->PrintStatus();
 
   TChain *input = new TChain("aodTree");
-  for (int run_num : {1}) {
-    input->Add(Form("/alice/sim/2016/LHC16g1a/246980/AOD/%03d/AliAOD.root", run_num));
+  // for (int run_num : {33, 34, 35, 36, 67, }) {
+    // input->Add(Form("/alice/sim/2016/LHC16g1a/246980/AOD/%03d/AliAOD.root", run_num));
+    // input->Add(Form("/alice/sim/2016/LHC16i3a/246982/AOD/%03d/AliAOD.root", run_num));
+  for (int run_num : {1, 2, 4, 5, 7,8,9}) {
+    input->Add(Form("/alice/sim/2016/LHC16i3a/246982/AOD198/%04d/AliAOD.root", run_num));
   }
 
   mgr->StartAnalysis("local", input);
@@ -203,7 +231,7 @@ RunGrid(TString wd)
     return;
   }
 
-  auto *mgr = NewAnalysisManagerExec();
+  auto *mgr = NewGridRunAnalysisManager(wd);
 
   setup_grid(mgr, wd, "full");
 
@@ -223,12 +251,11 @@ RunMerge(TString wd)
     return;
   }
 
-  auto *mgr = NewAnalysisManagerExec();
+  auto *mgr = NewGridMergeAnalysisManager(wd);
 
   setup_grid(mgr, wd, "terminate");
 
   mgr->InitAnalysis();
-  mgr->PrintStatus();
 
   mgr->StartAnalysis("merge");
 }
