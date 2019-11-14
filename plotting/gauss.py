@@ -289,6 +289,7 @@ def AddRoutRsideRatio(df):
     df['RoRs_err'] = error
     return df
 
+
 def merged_dataframe(df, keys, xkey='kT'):
     # ['Ro', 'Rs', 'Rl', 'lam', 'RoRs']
     merged_data = []
@@ -318,12 +319,18 @@ def merged_dataframe(df, keys, xkey='kT'):
     return pd.DataFrame(merged_data, columns=merged_keys)
 
 
-def plot_gauss_df(df, merge=True, cfg_filter=None, c=None, palette='colorblind'):
+def plot_gauss3d_df(df, merge=True, cfg_filter=None, c=None, palette='colorblind'):
     import ROOT
     from ROOT import TCanvas
     import seaborn as sns
 
-    df = AddRoutRsideRatio(df.copy())
+    if cfg_filter:
+        df = df[df.cfg==cfg_filter].copy()
+    else:
+        df = df.copy()
+
+    df = AddRoutRsideRatio(df)
+
     if merge:
         df = merged_dataframe(df, ['Ro', 'Rs', 'Rl', 'lam', 'RoRs'])
 
