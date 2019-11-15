@@ -97,19 +97,20 @@ os.chdir(_analysis_dir)
 
 # Setup ROOT Styles
 gStyle.SetOptStat(0)
-gStyle.SetCanvasDefW(1500)
-gStyle.SetCanvasDefH(900)
+# gStyle.SetCanvasDefW(1500)
+# gStyle.SetCanvasDefH(900)
 
-for _ax in 'XYZT':
-    gStyle.SetTitleSize(0.06, _ax)
-    gStyle.SetLabelSize(0.04, _ax)
+# for _ax in 'XYZT':
+#     gStyle.SetTitleSize(0.06, _ax)
+#     gStyle.SetLabelSize(0.04, _ax)
 
-for _ax, _offset in (('X', 1.5), ('Y', 1.1), ('Z', 1.3)):
-    gStyle.SetTitleOffset(_offset, _ax)
+# for _ax, _offset in (('X', 1.5), ('Y', 1.1), ('Z', 1.3)):
+#     gStyle.SetTitleOffset(_offset, _ax)
 
-gStyle.SetPadTopMargin(0.13)
-gStyle.SetPadBottomMargin(0.25)
-gStyle.SetPadLeftMargin(0.17)
-gStyle.SetPadRightMargin(0.25)
+# gStyle.SetPadTopMargin(0.13)
+# gStyle.SetPadBottomMargin(0.25)
+# gStyle.SetPadLeftMargin(0.17)
+# gStyle.SetPadRightMargin(0.25)
 
 gROOT.ForceStyle()
+
