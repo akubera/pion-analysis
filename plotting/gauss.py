@@ -6,26 +6,22 @@
 from . import PlotData
 import numpy as np
 import pandas as pd
+from functools import lru_cache
 
 
-KISIEL_GRAPHS = None
-
-
+@lru_cache
 def load_kisiel_graphs(cent_names=None):
     import feather
     import ROOT
     from collections import defaultdict
-    global KISIEL_GRAPHS
-
-#     if KISIEL_GRAPHS:
-#         return KISIEL_GRAPHS
+    from itertools import repeat
 
     kisiel_df_filename = "/home/akubera/Physics/pion-analysis/Run1Data.feather"
     kisiel_df = feather.read_dataframe(kisiel_df_filename)
 
     colors = [ROOT.kBlue, ROOT.kRed, ROOT.kGreen+2, ROOT.kOrange+2, ROOT.kMagenta-3, ROOT.kCyan+3]
-    markers = [25]* len(colors)
-    sizes = [0.8]* len(colors)
+    markers = repeat(25)
+    sizes = repeat(0.8)
 
     titles = {
         'Ro': 'R_{out} (fm)',
@@ -33,13 +29,15 @@ def load_kisiel_graphs(cent_names=None):
         'Rl': 'R_{long} (fm)'
     }
 
-    KISIEL_GRAPHS = kisiel_graphs = defaultdict(list)
+    kisiel_graphs = defaultdict(list)
     if cent_names is None:
         cent_names = []
 
+    centgroups = kisiel_df.groupby('cent')
+
     for key in ('Ro', 'Rs', 'Rl'):
-        for (cent, cdf), color, marker, msize in zip(kisiel_df.groupby('cent'), colors, markers, sizes):
-            graph = series_to_TGraphErrors(cdf, key)
+        for (cent, cdf), color, marker, msize in zip(centgroups, colors, markers, sizes):
+            graph = series_to_TGraphErrors(cdf, key, ekey=f'{key}_stat_err')
             graph.SetMarkerColor(color)
             graph.SetMarkerStyle(marker)
             graph.SetMarkerSize(msize)
@@ -48,23 +46,22 @@ def load_kisiel_graphs(cent_names=None):
             if key == 'Ro':
                 cent_names.append(cdf.iloc[0].centname)
 
-    for (cent, cdf), color, marker, msize in zip(kisiel_df.groupby('cent'), colors, markers, sizes):
+    for (cent, cdf), color, marker, msize in zip(centgroups, colors, markers, sizes):
         en = np.array(cdf["Ro_stat_err"])
         ed = np.array(cdf["Rs_stat_err"])
 
         os_ratio = np.array(cdf['Ro'] / cdf['Rs'])
         e = os_ratio * np.sqrt((en / cdf["Ro"])**2 + (ed / cdf["Rs"])**2)
 
-    #     e = np.zeros_like(en)
         graph = build_TGraphErrors(cdf.kT, cdf['Ro'] / cdf['Rs'], e)
         graph.SetMarkerColor(color)
         graph.SetMarkerStyle(marker)
         graph.SetMarkerSize(msize)
         graph.SetTitle("; k_{T} (GeV/c); R_{out} / R_{side};")
-    #     cent_names.append(cdf.iloc[0].centname)
+
         kisiel_graphs['RoRs'].append(graph)
 
-    return kisiel_graphs, cent_names
+    return dict(kisiel_graphs), cent_names
 
 
 def build_TGraphErrors(x, y, ye=None, xe=None):
@@ -110,7 +107,6 @@ def build_TH2(x, y, ye=None, xe=None):
     y = np.array(y)
     graph = TH2D(f"h{abs(hash(a.tobytes())):016X}", "", x.size, x, y, xe, ye)
     return graph
-
 
 
 def series_to_TH1D(series, ykey, ekey=None, xkey='kT'):
@@ -192,7 +188,142 @@ def group_df_into_tgraphs(df, colors=None, markers=None, sizes=None, titles=None
     return graphs
 
 
-def plot_gauss3d_points(df, c=None, kisiel_graphs=None):
+def plot_gauss3d_run1_comparison(df,
+                                 c=None,
+                                 merge=True,
+                                 run1_graphdict=None,
+                                 cfg_filter=None,
+                                 palette='colorblind'):
+    import ROOT
+    from ROOT import TCanvas, TLegend
+
+    if run1_graphdict is None:
+        run1_graphdict, run1_cents = load_kisiel_graphs()
+
+    if cfg_filter:
+        df = df[df.cfg==cfg_filter].copy()
+    else:
+        df = df.copy()
+
+    df = AddRoutRsideRatio(df)
+
+    if merge:
+        df = merged_dataframe(df, ['Ro', 'Rs', 'Rl', 'lam', 'RoRs'])
+
+    if c is None:
+        c = TCanvas()
+
+    plot = PlotData(c)
+
+    plot.legend = leg = TLegend()
+
+    get_cent_color = plot.color_loader(palette)
+
+    canvas_div_params = (1, 4, 0, 0)
+    canvas_size = (500, 1200)
+
+    canvas_div_params = (2, 2)
+    canvas_size = (900, 900)
+
+    c.Divide(*canvas_div_params)
+    c.SetCanvasSize(*canvas_size)
+
+    for i in range(4):
+        pad = c.cd(i+1)
+        pad.SetTickx(1)
+        pad.SetTicky(1)
+
+    keys = ['Ro', 'Rs', 'Rl', 'RoRs']
+    title_map = {
+        'Ro': 'R_{out}',
+        'Rs': 'R_{side}',
+        'Rl': 'R_{long}',
+        'RoRs': 'R_{out} / R_{side}',
+    }
+
+    XRANGE = 0.18, 1.02
+    YRANGE = 1.23, 9.3
+
+    yranges = [
+        YRANGE,
+        YRANGE,
+        YRANGE,
+        (0.45, 1.65),
+    ]
+
+    titles = [title_map[key] for key in keys]
+
+    plot.axhists = [ROOT.TH1C('h%d'%i, f'{title}; k_{{T}} GeV; {title}', 1000, *XRANGE)
+                    for i, title in enumerate(titles)]
+
+    c.SetFillColor(ROOT.kRed)
+
+    plot.run2_graphs = []
+
+    for i, hist in enumerate(plot.axhists):
+        xax, yax = hist.GetXaxis(), hist.GetYaxis()
+        yax.SetRangeUser(*yranges[i])
+        yax.SetNdivisions(909)
+        xax.SetNdivisions(509)
+
+        xax.SetLabelSize(0.06)
+        yax.SetLabelSize(0.065)
+        xax.SetTitleOffset(1.1)
+
+    for i, key in enumerate(keys, 1):
+        pad = c.cd(i)
+        hist = plot.axhists[i-1]
+        hist.Draw()
+        run1_graphs = run1_graphdict[key]
+
+        for graph, cent in zip(run1_graphs, run1_cents):
+            graph.SetMarkerColor(get_cent_color(cent))
+            graph.SetMarkerSize(1.2)
+            graph.Draw("SAME P")
+
+        for cent, cdf in df.groupby('cent'):
+            run2_graph = series_to_TGraphErrors(cdf, key)
+            run2_graph.SetMarkerColor(get_cent_color(cent))
+            run2_graph.SetMarkerSize(1.2)
+            run2_graph.SetMarkerStyle(33)
+            run2_graph.Draw("SAME P")
+            plot.run2_graphs.append(run2_graph)
+
+#         for graph in enumerate(run2_graphs):
+
+#             pass
+
+#         continue
+
+#         print(run1_graphs)
+#         continue
+#         for g, graph in enumerate(run1_graphs):
+#             graph.GetXaxis().SetRangeUser(0.0, 1.0)
+#             if g == 0:
+#                 graph.GetYaxis().SetRangeUser(*YRANGE)
+#                 graph.GetYaxis().SetTitleOffset(0.69)
+#                 graph.GetYaxis().CenterTitle()
+#                 graph.GetYaxis().SetNdivisions(405)
+
+#                 graph.GetXaxis().SetLabelSize(0.05)
+
+#                 graph.Draw('AP')
+#             else:
+#                 graph.Draw('SAME P')
+
+#             if i == 1:
+#                 leg.AddEntry(graph, cent_names[g], 'P')
+
+    plot.pads = []
+    plot.graphs = []
+
+    return plot
+
+
+def plot_gauss3d_points(df,
+                        c=None,
+                        kisiel_graphs=None,
+                        palette='colorblind'):
     import ROOT
     from ROOT import TCanvas, TLegend
 
@@ -213,6 +344,8 @@ def plot_gauss3d_points(df, c=None, kisiel_graphs=None):
     leg.SetHeader("Centrality", "C")
     leg.SetNColumns(3)
     leg.SetTextSize(0.03)
+
+    get_color = plot.color_loader(palette)
 
     if kisiel_graphs is True:
         kisiel_graphs, cent_names = load_kisiel_graphs()
@@ -245,6 +378,7 @@ def plot_gauss3d_points(df, c=None, kisiel_graphs=None):
 
     for i, key in enumerate(('Ro', 'Rs', 'Rl', 'RoRs'), 1):
         pad = c.cd(i)
+
 
     #     pad.SetTopMargin(0)
     #     pad.SetBottomMargin(0)
@@ -306,10 +440,14 @@ def merged_dataframe(df, keys, xkey='kT'):
             for key in keys:
                 vals = kdf[key]
                 errs = kdf[key + "_err"]
-                weights = errs ** -2
+                weights = np.power(errs, -2, where=errs>0, out=np.zeros_like(errs))
 
-                mean_val = (vals * weights).sum() / weights.sum()
-                err = weights.sum() ** -0.5
+                if (w := weights.sum()) > 0:
+                    mean_val = (vals * weights).sum() / w
+                    err = w ** -0.5
+                else:
+                    mean_val = vals.mean()
+                    err = 0.0
 
                 values.append(mean_val)
                 values.append(err)
