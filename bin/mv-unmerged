@@ -129,18 +129,28 @@ def main(argv=None):
             return 1
         grid.Rmdir(src)
 
+    remove_all_sources = None
+
     def alien_cp(src, dest):
+        nonlocal remove_all_sources
+
         if args.dry_run:
             return
+
         src, dest = map(str, (src, dest))
-        grid.Mkdir(dest)
+        if not grid.Mkdir(dest):
+            answer = input("Could not make directory, copy anyways? ")
+            if answer.lower() not in ("y", "yes"):
+                return
 
-        cp_cmd = run(['alien_cp',
-                      f'alien:/{src}/root_archive.zip',
-                      f'alien:/{dest}/'])
+        cp_cmd = ['alien_cp',
+                  f'alien:/{src}/root_archive.zip',
+                  f'alien:/{dest}/']
 
+        cp_cmd = run(cp_cmd, stderr=sp.PIPE)
         cp_stdout, cp_stderr = cp_cmd.communicate()
-        if cp_stderr:
+
+        if cp_cmd.returncode != 0:
             print("Copy command failed")
             print(" -- stdout --")
             print(cp_stdout)
@@ -150,9 +160,20 @@ def main(argv=None):
             if answer.lower() in ("y", "yes"):
                 grid.Rmdir(dest)
             return 1
-        answer = input("Remove destination directory? ")
-        if answer.lower() in ("y", "yes"):
+
+        if remove_all_sources is None:
+            answer = input("Remove source directory? (Yes/all/none)")
+            if answer.lower() in ("y", "yes"):
+                grid.Rmdir(src)
+            elif answer.lower() in ('a', "all"):
+                remove_all_sources = True
+            elif answer.lower() in ('n', "none"):
+                remove_all_sources = False
+
+        if remove_all_sources:
             grid.Rmdir(src)
+
+        return
 
     MOVE_PREFIX = 'X'
     STAGEMOVE_PREFIX = 'S'
