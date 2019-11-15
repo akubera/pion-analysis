@@ -432,6 +432,7 @@ def merged_dataframe(df, keys, xkey='kT'):
     for key in keys:
         merged_keys.append(key)
         merged_keys.append(key + '_err')
+        merged_keys.append(key + '_sys_err')
 
     for cent, cdf in df.groupby('cent'):
 
@@ -451,13 +452,21 @@ def merged_dataframe(df, keys, xkey='kT'):
 
                 values.append(mean_val)
                 values.append(err)
+                values.append(vals.std())
 
             merged_data.append(values)
 
     return pd.DataFrame(merged_data, columns=merged_keys)
 
 
-def plot_gauss3d_df(df, merge=True, cfg_filter=None, c=None, palette='colorblind'):
+def plot_gauss3d_df(df,
+                    merge=True,
+                    cfg_filter=None,
+                    c=None,
+                    palette='colorblind',
+                    marker_size=1.2,
+                    marker_style=21,
+                    shift=0.03):
     import ROOT
     from ROOT import TCanvas
     import seaborn as sns
@@ -509,7 +518,7 @@ def plot_gauss3d_df(df, merge=True, cfg_filter=None, c=None, palette='colorblind
     c.cd(6)
     plot.legend.Draw()
 
-    KT_RANGE = 0.17, 1.24
+    KT_RANGE = 0.17, 1.04
     TICKCODE_X = 408
 
     for i in range(1, cols*rows+1):
@@ -526,7 +535,7 @@ def plot_gauss3d_df(df, merge=True, cfg_filter=None, c=None, palette='colorblind
         ('R_{out}', YRNG),
         ('R_{side}', YRNG),
         ('R_{long}', YRNG),
-        ('#lambda', (0.0, 0.8)),
+        ('#lambda', (0.0, 0.6)),
         ('R_{out} / R_{side}', (0.5, 1.6))
     ]
 
@@ -541,7 +550,7 @@ def plot_gauss3d_df(df, merge=True, cfg_filter=None, c=None, palette='colorblind
         yax.SetRangeUser(*y_range)
         plot.axis_hists.append(axh)
 
-    y_ranges = [*[(1.0, 8.0)]*3, ]
+    shifts = shift * np.linspace(-1.0, 1.0, len(df.cent.unique()))
 
     for i, key in enumerate(['Ro', 'Rs', 'Rl', 'lam'], 1):
         pad = c.cd(i)
@@ -551,10 +560,14 @@ def plot_gauss3d_df(df, merge=True, cfg_filter=None, c=None, palette='colorblind
         for cidx, (cent, cdf) in enumerate(df.groupby('cent')):
 
             graph = series_to_TGraphErrors(cdf, key)
+            if shift:
+                x = np.frombuffer(graph.GetX(), np.float64, graph.GetN())
+                x += shifts[cidx]
+
             graph.SetMarkerColor(centrality_color(cent))
             graph.SetLineColor(centrality_color(cent))
-            graph.SetMarkerStyle(21)
-            graph.SetMarkerSize(0.8)
+            graph.SetMarkerStyle(marker_style)
+            graph.SetMarkerSize(marker_size)
             graph.Draw("SAME P")
 
             plot.graphs.append(graph)
@@ -567,12 +580,16 @@ def plot_gauss3d_df(df, merge=True, cfg_filter=None, c=None, palette='colorblind
 
     for cidx, (cent, cdf) in enumerate(df.groupby('cent')):
         graph = series_to_TGraphErrors(cdf, 'RoRs')
+        if shift:
+            x = np.frombuffer(graph.GetX(), np.float64, graph.GetN())
+            x += shifts[cidx]
+        # graph = series_to_TGraphErrors(cdf, 'RoRs')
         plot.graphs.append(graph)
 
         graph.SetMarkerColor(centrality_color(cent))
         graph.SetLineColor(centrality_color(cent))
-        graph.SetMarkerStyle(21)
-        graph.SetMarkerSize(0.8)
+        graph.SetMarkerStyle(marker_style)
+        graph.SetMarkerSize(marker_size)
 
         graph.Draw("SAME P")
 
