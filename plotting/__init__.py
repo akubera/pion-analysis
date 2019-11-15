@@ -27,9 +27,12 @@ class PlotData:
         centrality_colors = {}
 
         def centrality_color(cent):
-            if cent not in centrality_colors:
-                centrality_colors[cent] = next(color_it)
-            return centrality_colors[cent]
+            cent = cent.rstrip('%')
+            centparts = cent.split('-') if '-' in cent else cent.split('_')
+            cent_key = tuple('%g' % float(f) for f in centparts)
+            if cent_key not in centrality_colors:
+                centrality_colors[cent_key] = next(color_it)
+            return centrality_colors[cent_key]
 
         return centrality_color
 
