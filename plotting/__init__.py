@@ -36,6 +36,12 @@ class PlotData:
 
         return centrality_color
 
+    @staticmethod
+    def get_random_str(N=10, prefix='', suffix=''):
+        from random import choices
+        from string import ascii_letters
+        return prefix + ''.join(choices(ascii_letters, k=N)) + suffix
+
 
 class FitData:
 
