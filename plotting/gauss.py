@@ -290,7 +290,7 @@ def plot_gauss3d_run1_comparison(df,
             run2_graph = series_to_TGraphErrors(cdf, key)
             run2_graph.SetMarkerColor(get_cent_color(cent))
             run2_graph.SetMarkerSize(1.2)
-            run2_graph.SetMarkerStyle(33)
+            run2_graph.SetMarkerStyle(20)
             run2_graph.Draw("SAME P")
             plot.run2_graphs.append(run2_graph)
 
@@ -843,17 +843,26 @@ def plot_gauss3d_df(df,
         pad.SetTickx(1)
         pad.SetTicky(1)
 
-    YRNG = 1.1, 7.9
-    hist_info = [
-        ('R_{out}', YRNG),
-        ('R_{side}', YRNG),
-        ('R_{long}', YRNG),
-        ('#lambda', (0.0, 0.6)),
-        ('R_{out} / R_{side}', (0.5, 1.6))
-    ]
+    hist_keys = ['Ro', 'Rs', 'Rl', 'lam', 'RoRs']
 
-    for title, y_range in hist_info:
-        axh = ROOT.TH1C("h%s" % random(), f"{title}; k_{{T}} (GeV)", 1000, 0.0, 1.5)
+    YRNG = 1.1, 7.9
+    hist_info = {
+        'Ro': ('R_{out}', YRNG),
+        'Rs': ('R_{side}', YRNG),
+        'Rl': ('R_{long}', YRNG),
+        'lam': ('#lambda', (0.0, 0.6)),
+        'RoRs': ('R_{out} / R_{side}', (0.5, 1.6)),
+    }
+
+    def _build_hist():
+        return ROOT.TH1C("h%s" % random(), "; k_{T} (GeV)", 1000, 0.0, 1.5)
+
+    plot.axis_hist_dict = {key: _build_hist() for key in hist_keys}
+
+    for key in hist_keys:
+        title, y_range = hist_info[key]
+        axh = plot.axis_hist_dict[key]
+        axh.SetTitle(title)
         axh.SetTitleOffset(0.0)
         xax, yax = axh.GetXaxis(), axh.GetYaxis()
         xax.SetTitleOffset(0.89)
@@ -865,10 +874,9 @@ def plot_gauss3d_df(df,
 
     shifts = shift * np.linspace(-1.0, 1.0, len(df.cent.unique()))
 
-    for i, key in enumerate(['Ro', 'Rs', 'Rl', 'lam'], 1):
+    for i, key in enumerate(hist_keys, 1):
         pad = c.cd(i)
-
-        plot.axis_hists[i-1].Draw()
+        plot.axis_hist_dict[key].Draw()
 
         for cidx, (cent, cdf) in enumerate(df.groupby('cent')):
 
