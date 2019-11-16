@@ -51,6 +51,10 @@ class PlotData:
     def colors(self):
         return self.color_dict.get('', [])
 
+    def set_title_size(self, size):
+        self.Update()
+        self.GetPrimitive('title').SetTextSize(size)
+
     @staticmethod
     def get_random_str(N=10, prefix='', suffix=''):
         from random import choices
