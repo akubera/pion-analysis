@@ -29,18 +29,12 @@ load_files(std::string filename)
   return result;
 }
 
-#define MERGE_MODE true
-
 
 void
-setup_grid(AliAnalysisManager *mgr, TString workdir)
+setup_grid(AliAnalysisManager *mgr, TString workdir, TString mode)
 {
   auto *alien = new AliAnalysisAlien();
-#if MERGE_MODE
-  alien->SetRunMode("terminate");
-#else
-  alien->SetRunMode("full");
-#endif
+  alien->SetRunMode(mode);
   alien->SetGridOutputDir("output");
   alien->SetGridWorkingDir(workdir);
   alien->SetAliPhysicsVersion("vAN-20190801_ROOT6-1");
@@ -124,7 +118,7 @@ AddTasks()
         $pion_1_max_impact_z = 2.0;
          @is_mc_analysis = true; ~trueq3d_extra_bins = true; @num_events_to_mix = 4;
          @enable_pair_monitors=false;  $mc_pion_only=true; $pair_delta_eta_min = 0.01;
-         $pair_delta_phi_min = 0.03; $pion_1_rm_neg_lbl = false; $pion_1_sigma = 3.0;
+         $pair_delta_phi_min = 0.03; $pion_1_rm_neg_lbl = false; $pion_1_tpc_sigma = 3.0;
          $pion_1_min_tpc_chi_ndof = 0.33; )"); )"");
 
   gROOT->ProcessLine(R""(
@@ -139,7 +133,7 @@ AddTasks()
        ~eventreader_filter_bit=128;  ~eventreader_multibit=true;  ~eventreader_read_full_mc=true;
        @is_mc_analysis = true; ~trueq3d_extra_bins = true; @num_events_to_mix = 4;
        @enable_pair_monitors=false;  $mc_pion_only=true; $pair_delta_eta_min = 0.01;
-       $pair_delta_phi_min = 0.03; $pion_1_sigma = 3.0; $pion_1_min_tpc_chi_ndof = 0.33;
+       $pair_delta_phi_min = 0.03; $pion_1_tpc_sigma = 3.0; $pion_1_min_tpc_chi_ndof = 0.33;
        $pion_1_rm_neg_lbl = true; )"); )"");
 
   gROOT->ProcessLine(R""(
@@ -155,7 +149,7 @@ AddTasks()
        ~eventreader_dca_globaltrack = 0;
        @is_mc_analysis = true; ~trueq3d_extra_bins = true; @num_events_to_mix = 4;
        @enable_pair_monitors=false;  $mc_pion_only=true; $pair_delta_eta_min = 0.01;
-       $pair_delta_phi_min = 0.03; $pion_1_sigma = 3.0; $pion_1_min_tpc_chi_ndof = 0.33;
+       $pair_delta_phi_min = 0.03; $pion_1_tpc_sigma = 3.0; $pion_1_min_tpc_chi_ndof = 0.33;
        $pion_1_max_impact_xy=0.02; $pion_1_max_impact_z=0.04;
        $pion_1_rm_neg_lbl = true; )"); )"");
 
@@ -209,9 +203,7 @@ RunGrid(TString wd)
     return;
   }
 
-  auto *mgr = NewAnalysisManagerExec();
-
-  setup_grid(mgr, wd);
+  auto *mgr = NewGridRunAnalysisManager();
 
   mgr->InitAnalysis();
   mgr->PrintStatus();
@@ -229,12 +221,9 @@ RunMerge(TString wd)
     return;
   }
 
-  auto *mgr = NewAnalysisManagerExec();
-
-  setup_grid(mgr, wd);
+  auto *mgr = NewGridMergeAnalysisManager();
 
   mgr->InitAnalysis();
-  mgr->PrintStatus();
 
   mgr->StartAnalysis("merge");
 }
