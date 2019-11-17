@@ -12,10 +12,12 @@ _notebook_dir = Path(__file__).parent
 _analysis_dir = _notebook_dir.parent
 
 # locate FemtoFitter & insert into sys.path
-_ff_path = _analysis_dir / 'femtofitter'
-_ff_path = Path(environ.get('FEMTOFITTER_PATH', _ff_path))
+_ff_path = environ.get('FEMTOFITTER_PATH', _analysis_dir / 'femtofitter')
+_ff_path = Path(_ff_path).resolve()
 
-if _ff_path.exists() and str(_ff_path) not in sys.path:
+_sys_paths = [Path(p).resolve() for p in sys.path]
+
+if _ff_path.exists() and _ff_path not in _sys_paths:
     sys.path.insert(0, str(_ff_path))
 
 # Add femtofitter build path into LD_LIBRARY_PATH
