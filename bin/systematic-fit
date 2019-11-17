@@ -1,0 +1,545 @@
+#!/usr/bin/env python3
+#
+# systematic-fit
+#
+
+from abc import abstractmethod, abstractclassmethod
+from typing import Optional, Iterable, Any, Tuple, List, Generator, Iterator
+
+import re
+import sys
+import json
+import asyncio
+from os import environ
+
+from glob import glob
+from hashlib import md5
+from pathlib import Path
+from pprint import pprint
+from functools import partial
+from itertools import chain, product, islice
+from datetime import datetime
+from dataclasses import dataclass
+
+import pandas as pd
+from tqdm import tqdm
+
+
+def arg_parser():
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("data_files",
+                        nargs='+',
+                        help="files to fit")
+    parser.add_argument("-o", "--output",
+                        help="Output fitresult json file")
+    parser.add_argument("--fit-1d",
+                        default='Fitter1DGaussPolyBg',
+                        help="List of 1D fitter classes")
+    parser.add_argument("--mrc-1d",
+                        default='Mrc1DRatioMixed:MRC-10.root',
+                        help="MRC Class to use for 1D data (specify args with colon)")
+    parser.add_argument("--fit-3d",
+                        default='Fitter3DGaussLcms',
+                        help="List of 3D fitter classes")
+    parser.add_argument("--mrc-3d",
+                        default='Mrc3DRatioMixed:MRC-10.root',
+                        help="MRC Class to use for 3D data")
+    parser.add_argument("--only-1d",
+                        action='store_true',
+                        help="Only load 1D analyses")
+    parser.add_argument("--only-3d",
+                        action='store_true',
+                        help="Only load 3D analyses")
+    parser.add_argument("--fsi",
+                        default='FsiKFile:KFile4.root',
+                        help="FSI Class to use")
+    parser.add_argument("--limit",
+                        type=int,
+                        help='Limit number of fits')
+    parser.add_argument("--skip",
+                        type=int,
+                        help='Number of fits to skip')
+    parser.add_argument("--fit-opts",
+                        help='Fit options')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+
+    datafiles = FileCollection(args.data_files)
+    if not datafiles.files:
+        print("Found no datafiles", file=sys.stderr)
+        return 1
+
+    log = partial(print, file=sys.stderr)
+
+    if args.output == '-':
+        output = sys.stdout
+        log("Writing output to stdout")
+    else:
+        if args.output is None:
+            output = datafiles.output_filename()
+        else:
+            output = args.output
+
+        log(f"Writing output to {output}")
+
+    load_femtofitter_library()
+
+    try:
+        analysis_loader = AnalysisLoader(args)
+    except ValueError:
+        return 1
+
+    analyses = list(analysis_loader.iter_analyses(datafiles))
+
+    print("Found", len(analyses), 'analyses')
+
+    analyses[0].run_fit()
+    return 0
+
+    timestamp = datetime.now()
+    results = asyncio.run(run_fits(analyses))
+    duration = datetime.now() - timestamp
+
+
+async def run_fits(analyses: Iterable['AnalysisRef'], executor=None):
+    from asyncio import wait, get_running_loop, FIRST_COMPLETED
+
+    loop = get_running_loop()
+
+    if executor is None:
+        from concurrent.futures import ProcessPoolExecutor
+        executor = ProcessPoolExecutor()
+
+    pending = [loop.run_in_executor(executor, AnalysisRef.run_fit, p)
+               for p in analyses]
+    finished = []
+
+    with tqdm(total=len(pending)) as pbar:
+        while pending:
+            done, pending = await wait(pending, return_when=FIRST_COMPLETED)
+            finished.extend([r.result()
+                             for r in done
+                             if r.result() is not None])
+            pbar.update(len(done))
+
+    return finished
+
+
+def run_fit(fit_data: ''):
+    from ROOT import TFile
+
+    fit_data.load_fitter_class()
+
+
+def load_datamap(path=None):
+    path = Path(path or environ.get("PYFIT_DATAMAP", ".datamap"))
+    return json.loads(path.read_text() if path.exists() else "{}")
+
+
+class FileCollection:
+
+    DATA_PATHS = [Path("~/Physics/data").expanduser(),
+                  Path("~/alice/data").expanduser(),
+                  Path("/alice/cern.ch").expanduser()]
+
+    def __init__(self, pattern):
+        self.files = [DataFile(f) for f in self.find_files(pattern)]
+
+    @classmethod
+    def find_files(cls, path):
+        if isinstance(path, (list, tuple)):
+            results = []
+            for p in path:
+                results += cls.find_files(p)
+            return results
+
+        path_str = str(path)
+        if path_str.isalnum():
+            path_str = f'*{path_str}*'
+
+        path = Path(path)
+        if '*' in path_str:
+            if path.is_absolute():
+                found_paths = [glob(path_str)]
+            else:
+                found_paths = (s.rglob(path_str)
+                               for s in cls.DATA_PATHS)
+
+            found_paths = chain.from_iterable(found_paths)
+            rootfiles = (path
+                         for path in map(Path, found_paths)
+                         if path.suffix == '.root')
+
+            return list(rootfiles)
+
+        return [path]
+
+    def __iter__(self) -> Iterator['DataFile']:
+        yield from self.files
+
+    def output_filename(self):
+        from datetime import datetime
+        dt = datetime.now()
+        output = f"FITRES-{dt:%y%m%d%H%M%S}.json"
+        return output
+
+
+class DataFile:
+
+    def __init__(self, path):
+        path = Path(path).absolute()
+
+        if path.suffix != '.root':
+            raise ValueError("DataFile not constructed with ROOT file")
+
+        if not path.exists():
+            raise ValueError(f"DataFile does not exist {path}")
+
+        self.path = path
+        pathstr = str(path)
+
+        if (m := re.search(r"""(?P<train>\w+)-
+                               (?P<train_id>\d+)-
+                               (?P<dataset>\w+)-
+                               (?:child_(?P<part>\d+)-)?
+                               (?P<field>[a-z]+).root
+                            """, path.name, re.X)):
+            tag = f"{m.group('train')}_{m.group('train_id')}"
+            field = m.group('field')
+            partition = m.group('part')
+
+        elif (m := re.search(r"""
+                              (?P<train>\w+)/
+                              (?P<train_id>\d+)_
+                              (?P<date>\d+\-\d{4})
+                              (?:_child_(?P<part>\d+))?/
+                              merge_runlist_(?P<runlist>\d+)
+                              """, pathstr, re.X)):
+            tag = f"{m.group('train')}_{m.group('train_id')}"
+            field = m.group('runlist')
+            # if field not in '12':
+            #     raise ValueError(f"Cannot assume field from integer "
+            #                      f"'{field}' in path {path}")
+            field = {'1': 'negfield', '2': 'posfield'}.get(field, '??')
+            partition = m.group('part')
+
+        elif (m := re.search(r"""(?P<tag>[^-]+)-
+                                 (?P<field>[a-z]+)
+                                 (?:-(?P<partition>\d+))?.root
+                              """, path.name, re.X)):
+            tag = m.group('tag')
+            field = m.group('field')
+            partition = m.group('partition')
+
+        else:
+            raise ValueError(f"Could not parse information out of path {pathstr}")
+
+        self.tag = tag
+        self.md5 = md5(self.path.read_bytes()).hexdigest()
+        self.field = {'posfield': '++',
+                      'negfield': '--'}.get(field, '??')
+        self.partition = partition
+
+    def __repr__(self):
+        return f'<DataFile {self.path}>'
+
+    def __str__(self):
+        return str(self.path)
+
+
+class AnalysisLoader:
+    """
+    Load analyses
+    """
+
+    def __init__(self, args):
+        self.cli_args = args
+
+        self.fitters_1d = (args.fit_1d.split(',')
+                           if not args.only_3d
+                           else [])
+        self.fitters_3d = (args.fit_3d.split(',')
+                           if not args.only_1d
+                           else [])
+
+        # validate fitters
+        import ROOT
+        errors = False
+
+        for fitter_cls in chain(self.fitters_1d, self.fitters_3d):
+            try:
+                getattr(ROOT, fitter_cls)
+            except AttributeError:
+                print("Could not load fitter:", fitter_cls, file=sys.stderr)
+                errors = True
+
+        try:
+            self.fsi_cls, self.fsi_args = self.parse_fsi(args.fsi)
+        except Exception:
+            errors = True
+
+        if self.fitters_1d:
+            try:
+                self.mrc1d_cls, self.mrc1d_args = self.parse_mrc(args.mrc_1d)
+            except Exception:
+                errors = True
+
+        if self.fitters_1d:
+            try:
+                self.mrc3d_cls, self.mrc3d_args = self.parse_mrc(args.mrc_3d)
+            except Exception:
+                errors = True
+
+        if errors:
+            raise ValueError
+
+    @classmethod
+    def parse_fsi(cls, fsi):
+        # validate fsi
+        fsi_cls, _, fsi_args = fsi.partition(':')
+        try:
+            fsi_cls = getattr(ROOT, fsi_cls)
+        except AttributeError:
+            print(f"Could not load FSI class {fsi_cls!r}", file=sys.stderr)
+            raise
+
+        try:
+            fsi_args = cls.eval_args(fsi_args) if fsi_args else ()
+        except Exception as e:
+            print(f"Could not parse {fsi_args!r} ({e})", file=sys.stderr)
+            raise
+
+        return fsi_cls, fsi_args
+
+    @classmethod
+    def parse_mrc(cls, mrc):
+        mrc_cls, _, mrc_args = mrc.partition(':')
+        try:
+            mrc_cls = getattr(ROOT, mrc_cls)
+        except AttributeError:
+            print(f"Could not load MRC class {mrc_cls!r}", file=sys.stderr)
+            raise
+
+        try:
+            mrc_args = cls.eval_args(mrc_args) if mrc_args else ()
+        except Exception as e:
+            print(f"Could not parse {mrc_args!r} ({e})", file=sys.stderr)
+            raise
+
+        return mrc_cls, mrc_args
+
+    def iter_analyses(self, datafiles) -> Iterator['AnalysisRef']:
+        analysis_iter = self._iter_analyses(datafiles)
+        if (limit := self.cli_args.limit):
+            return islice(analysis_iter, limit)
+
+        return analysis_iter
+
+    def _iter_analyses(self, datafiles) -> Generator['AnalysisRef', None, None]:
+        from ROOT import TFile
+        from stumpy.utils import walk_matching
+
+        print(self.cli_args.fsi)
+        for file in datafiles:
+            # print("file", file)
+            tfile = TFile.Open(str(file))
+            assert tfile
+
+            for path, tdir in walk_matching(tfile, 'PWG2FEMTO/*/*'):
+
+                walk = walk_matching(tdir, 'KT_Qinv/*_*')
+                for fittr, (apath, atdir) in product(self.fitters_1d, walk):
+                    params = {'fitter_cls': fittr,
+                              'mrc_cls': 'FITR'}
+                    yield AnalysisRefQinv(file, f'{path}/{apath}', params)
+
+                walk = walk_matching(tdir, 'KT_PQ3D/*_*')
+                for fittr, (apath, atdir) in product(self.fitters_3d, walk):
+                    params = {'fitter_cls': fittr}
+                    yield AnalysisRefQ3D(file, f'{path}/{apath}', params)
+
+    @staticmethod
+    def eval_args(args) -> Tuple[Any]:
+        from ast import literal_eval
+
+        res = []
+        if isinstance(args, str):
+            try:
+                args = literal_eval(args)
+            except ValueError:
+                for arg in args.split(','):
+                    try:
+                        a = literal_eval(arg)
+                    except ValueError:
+                        a = arg
+                    res.append(a)
+            else:
+                if isinstance(args, (tuple, list)):
+                    res = args
+                else:
+                    res = (args, )
+
+        return tuple(res)
+
+
+class AnalysisRef:
+
+    DEFUALT_MRC_ARGS = 'MRC-10.root'
+
+    def __init__(self, filename, path, fitparams):
+        self.filename = Path(str(filename)).absolute()
+        self.path = path
+        self.params = fitparams
+
+    def run_fit(self):
+        from ROOT import TFile
+        tfile = TFile.Open(str(self.filename))
+        if not tfile:
+            print("error loading tfile", file=sys.stderr)
+            return None
+
+        tdir = tfile.Get(self.path)
+        if not tdir:
+            print("error loading tdir", file=sys.stderr)
+            return None
+
+        data = self.load_data(tdir)
+        if not data:
+            print("error loading data", file=sys.stderr)
+            return
+
+        fitter = self.build_fitter(data)
+
+        if self.params.get('chi2'):
+            fit_method = fitter.fit_chi2_mrc if fitter.mrc else fitter.fit_chi2
+        else:
+            fit_method = fitter.fit_pml_mrc if fitter.mrc else fitter.fit_pml
+
+        fit_result = fit_method()
+        results = fit_result.as_dict()
+        results['fsi'] = str(fitter.fsi.ClassName())
+
+        pprint(results)
+
+        return results
+
+    @abstractclassmethod
+    def load_data(self, tdir):
+        ...
+
+    def build_fitter(self, data):
+        FitterClass = self.get_fitter_class()
+        fitter = FitterClass(data)
+        self.add_fsi(fitter)
+        self.add_mrc(fitter)
+        return fitter
+
+    def add_fsi(self, fitter):
+        FsiClass = self.get_fsi_class()
+        fsi_args = self.params.get('fsi-args', ())
+        fsi_args = AnalysisLoader.eval_args(fsi_args)
+        fitter.fsi = FsiClass.From(*fsi_args)
+
+    def add_mrc(self, fitter):
+        MrcClass = self.get_mrc_class()
+        if not MrcClass:
+            return
+        mrc_args = self.params.get('mrc_args', self.DEFAULT_MRC_ARGS)
+        fitter.mrc = MrcClass.From(*mrc_args)
+
+    def load_fsi(self, fitter):
+        import ROOT
+        fitter.fsi = FsiClass.From(self.params.get('fsi_args', 'KFile4.root'))
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} {self.filename.name}:{self.path}>'
+
+    def load_mrc(self, fitter):
+        import ROOT
+        MrcClass = getattr(ROOT, self.params.get('mrc_cls', self.DEFAULT_MRC))
+        fitter.mrc = MrcClass.From(*self.params.get('mrc_args', self.DEFAULT_MRC_ARGS))
+
+    def get_fitter_class(self):
+        import ROOT
+        FitterClass = getattr(ROOT, self.params.get('fitter_cls'))
+        return FitterClass
+
+    def get_mrc_class(self):
+        import ROOT
+        FitterClass = getattr(ROOT, self.params.get('fitter_cls'))
+        return FitterClass
+
+    def get_fsi_class(self) -> type:
+        import ROOT
+        # classname = self.params.get('fsi_cls', 'FsiStatic')
+        classname = self.params.get('fsi_cls', 'FsiKFile')
+        try:
+            FsiClass = getattr(ROOT, classname)
+        except AttributeError:
+            raise TypeError(f"Could not find fsi class {classname!r}")
+
+        return FsiClass
+
+
+class AnalysisRefQinv(AnalysisRef):
+
+    DEFAULT_FITTER_CLASS = 'Fitter1DGaussPolyBg'
+    DEFUALT_MRC = 'Mrc1DRatioMixed'
+
+    def load_data(self, tdir):
+        from ROOT import Data1D
+        data1d = Data1D.From(tdir, 0.12)
+        assert data1d
+
+        return data1d
+
+
+class AnalysisRefQ3D(AnalysisRef):
+
+    DEFAULT_FITTER_CLASS = 'Fitter3DGaussLcms'
+    DEFUALT_MRC = 'Mrc3DRatioMixed'
+
+    def load_data(self, tdir):
+        from ROOT import Data3D
+        data = Data3D.From(tdir)
+        return data
+
+
+def load_python_module(name, path):
+    import sys
+    from importlib.machinery import SourceFileLoader
+    from importlib.util import spec_from_loader, module_from_spec
+
+    loader = SourceFileLoader(name, path)
+    spec = spec_from_loader(loader.name, loader)
+    mod = module_from_spec(spec)
+    loader.exec_module(mod)
+
+    sys.modules[name] = mod
+
+    return mod
+
+
+def load_femtofitter_library():
+    import os
+    __dir__ = Path(__file__).parent
+    femtofitter = (__dir__.parent / 'femtofitter').absolute()
+    ff = str(femtofitter)
+
+    if ff not in sys.path:
+        sys.path.insert(0, ff)
+
+    from femtofitter import load_femtofitter_lib
+
+    import ROOT
+    load_femtofitter_lib()
+
+
+if __name__ == "__main__":
+    exit(main())
