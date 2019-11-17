@@ -66,10 +66,12 @@ from femtofitter import FitResults, PathQuery
 # ROOT classes
 from ROOT import gROOT, gSystem, gInterpreter, gPad, gStyle, gDirectory
 from ROOT import TCanvas, TPad
+from ROOT import TLatex, TLine
 from ROOT import TFile
 from ROOT import TH1, TH3, TF1, TF2
 from ROOT import TH1D, TH1F, TH2D, TH2F, TH3D, TH3F
 from ROOT import TProfile, TProfile2D
+
 TH1.AddDirectory(False)
 
 # AliROOT Classes
