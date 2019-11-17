@@ -8,6 +8,9 @@
 *.zip
 *.bz2
 
+*.xml
+*.json
+
 __pycache__/
 *.py[cod]
 
