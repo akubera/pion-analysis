@@ -93,6 +93,8 @@ def main(argv=None):
     try:
         analysis_loader = AnalysisLoader(args)
     except ValueError:
+        print(f"Could not load analyses from args {args.data_files!r}",
+              file=sys.stderr)
         return 1
 
     analyses = list(analysis_loader.iter_analyses(datafiles))
@@ -472,8 +474,8 @@ class AnalysisRef:
 
     def get_mrc_class(self):
         import ROOT
-        FitterClass = getattr(ROOT, self.params.get('fitter_cls'))
-        return FitterClass
+        MrcClass = getattr(ROOT, self.params.get('mrc_cls'))
+        return MrcClass
 
     def get_fsi_class(self) -> type:
         import ROOT
