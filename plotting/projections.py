@@ -175,7 +175,6 @@ def plot_fit_projections(fitresult,
     }
     
     for j, series in enumerate(rows, 1):
-        # print(series)
         pq = PathQuery.From(series)
         tdir = tfile.Get(pq.as_path())
         
@@ -194,9 +193,8 @@ def plot_fit_projections(fitresult,
             
         cf = fitter.get_cf(fit_params)
         if fitter.mrc:
-#             cf_den = fitter.mrc.GetSmearedDenLike(cf)
-            cf_den = den
-        else: 
+            cf_den = fitter.mrc.GetSmearedDenLike(cf)
+        else:
             cf_den = den
             
         cf.Multiply(cf_den)
@@ -207,7 +205,7 @@ def plot_fit_projections(fitresult,
         def get_range(hist, get_ax):
             return [max(get_ax(hist).FindBin(x), 1)
                     for x in int_range]
-        
+
         spad = pad.cd(j)
         spad.Divide(3, 1, 0, 0)
         for i, ax in enumerate('xyz'):
@@ -220,7 +218,7 @@ def plot_fit_projections(fitresult,
   
             n = project(num, f"n{ax}", *range1, *range2)
             d = project(den, f"d{ax}", *range1, *range2)
-            
+
             cf_p = project(cf, f"fit{ax}", *range1, *range2)
             cf_d = project(cf_den, f"fitden{ax}", *range1, *range2)
 
@@ -237,9 +235,7 @@ def plot_fit_projections(fitresult,
             cf_p.SetLineWidth(2)
             cf_p.SetTitle("")
             cf_p.Divide(cf_d)
-#             cf_p.Divide(d)
             cf_p.SetStats(0)
-#             cf_p.DrawCopy("HIST C")
             cf_p.DrawCopy("SAME HIST C")
 
     return plot
