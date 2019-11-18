@@ -1,6 +1,6 @@
 ---
-aliphysics-version: "vAN-20191109_ROOT6-1"
-max-input-files: 20
+aliphysics-version: "vAN-20191116_ROOT6-1"
+max-input-files: 45
 max-merge-files: 20
 ttl: "24 * 60 * 60"
 
@@ -18,10 +18,10 @@ tasks:
       "@num_events_to_mix = 3;"
       "~eventreader_dca_globaltrack = 0;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
-      "$pion_1_sigma=2.0;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tpc_sigma=2.0;"
       "$pion_1_tof_sigma=6.0;"
       "$pair_delta_eta_min=0.0; $pair_delta_phi_min=0.0;"
 
@@ -35,10 +35,10 @@ tasks:
       "@num_events_to_mix = 3;"
       "~eventreader_dca_globaltrack = 0;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
-      "$pion_1_sigma=2.0;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tpc_sigma=2.0;"
       "$pion_1_tof_sigma=6.0;"
       "$pair_delta_eta_min=0.005; $pair_delta_phi_min=0.009;"
 
@@ -52,10 +52,10 @@ tasks:
       "@num_events_to_mix = 3;"
       "~eventreader_dca_globaltrack = 0;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
-      "$pion_1_sigma=2.0;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tpc_sigma=2.0;"
       "$pion_1_tof_sigma=6.0;"
       "$pair_delta_eta_min=0.01; $pair_delta_phi_min=0.01;"
 
@@ -69,10 +69,10 @@ tasks:
       "@num_events_to_mix = 3;"
       "~eventreader_dca_globaltrack = 0;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
-      "$pion_1_sigma=2.0;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tpc_sigma=2.0;"
       "$pion_1_tof_sigma=6.0;"
       "$pair_delta_eta_min=0.01; $pair_delta_phi_min=0.02;"
 
@@ -86,10 +86,10 @@ tasks:
       "@num_events_to_mix = 3;"
       "~eventreader_dca_globaltrack = 0;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
-      "$pion_1_sigma=2.0;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tpc_sigma=2.0;"
       "$pion_1_tof_sigma=6.0;"
       "$pair_delta_eta_min=0.012; $pair_delta_phi_min=0.018;"
 
@@ -103,9 +103,8 @@ tasks:
       "@num_events_to_mix = 3;"
       "~eventreader_dca_globaltrack = 0;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
-      "$pion_1_sigma=2.0;"
+      "$pion_1_tpc_sigma=2.0;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
-      "$pion_1_max_its_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
       "$pair_delta_eta_min=0.012; $pair_delta_phi_min=0.018;"
