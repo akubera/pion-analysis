@@ -190,6 +190,10 @@ class Plotz:
         leg.Draw()
         plot.mult_sum.Draw("SAME")
 
+        plot.black_bottom_hist = ROOT.TH1C("bbh", "", 100, 0, 5500)
+        plot.black_bottom_hist.SetLineColor(ROOT.kBlack)
+        plot.black_bottom_hist.Draw("SAME")
+
         return plot
 
     def build_zvertex_canvas(self, c=None):
