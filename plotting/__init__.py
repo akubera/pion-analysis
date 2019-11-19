@@ -11,18 +11,25 @@ class PlotData:
 
     def __init__(self, c=None):
         self.canvas = c
+        self.tcolor_dict = {}
+        self.color_dict = {}
 
     def __getattr__(self, key):
         return getattr(self.canvas, key)
 
-    def color_loader(self, palette):
+    def color_loader(self, palette, key=''):
         from ROOT import TColor
         import seaborn as sns
-        colors = sns.color_palette(palette)
-        self.tcolors = [TColor(*rgb) for rgb in colors]
-        self.colors = [tcolor.GetNumber() for tcolor in self.tcolors]
 
-        color_it = iter(self.colors)
+        colors = sns.color_palette(palette)
+
+        if key not in self.tcolor_dict:
+            self.tcolor_dict[key] = [TColor(*rgb) for rgb in colors]
+            colors = self.color_dict[key] = [tcolor.GetNumber() for tcolor in self.tcolor_dict[key]]
+        else:
+            colors = self.color_dict[key]
+
+        color_it = iter(colors)
 
         centrality_colors = {}
 
@@ -35,6 +42,14 @@ class PlotData:
             return centrality_colors[cent_key]
 
         return centrality_color
+
+    @property
+    def tcolors(self):
+        return self.tcolor_dict.get('', [])
+
+    @property
+    def colors(self):
+        return self.color_dict.get('', [])
 
     @staticmethod
     def get_random_str(N=10, prefix='', suffix=''):
