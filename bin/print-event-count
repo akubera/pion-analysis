@@ -34,8 +34,8 @@ def main(argv=None):
 
 
 def scan_tfile(path):
-    from ROOT import TFile
     from stumpy.utils import walk_matching
+    from ROOT import TFile
 
     tfile = TFile.Open(str(path))
     if not tfile:
