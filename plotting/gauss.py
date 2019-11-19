@@ -19,7 +19,12 @@ def load_kisiel_graphs(cent_names=None):
     kisiel_df_filename = "/home/akubera/Physics/pion-analysis/Run1Data.feather"
     kisiel_df = feather.read_dataframe(kisiel_df_filename)
 
-    colors = [ROOT.kBlue, ROOT.kRed, ROOT.kGreen+2, ROOT.kOrange+2, ROOT.kMagenta-3, ROOT.kCyan+3]
+    colors = [ROOT.kBlue,
+              ROOT.kRed,
+              ROOT.kGreen+2,
+              ROOT.kOrange+2,
+              ROOT.kMagenta-3,
+              ROOT.kCyan+3]
     markers = repeat(25)
     sizes = repeat(0.8)
 
@@ -185,7 +190,7 @@ def group_df_into_tgraphs(df, colors=None, markers=None, sizes=None, titles=None
 
         graphs['RoRs'].append(graph)
 
-    return graphs
+    return dict(graphs)
 
 
 def plot_gauss3d_run1_comparison(df,
@@ -320,6 +325,309 @@ def plot_gauss3d_run1_comparison(df,
     return plot
 
 
+def merge_statistical_points(df, key):
+    results = []
+
+    for kt, data in df.groupby('kT'):
+        errs = np.array(data[key + '_err'])
+        weights = errs ** -2
+        val = (data[key] * weights).sum() / weights.sum()
+        err = np.sqrt(1.0 / weights.sum())
+        results.append([kt, val, err])
+
+    return np.array(results).T
+
+
+def build_tgraphs_from_data(df, sysdf=None):
+    from collections import defaultdict
+    from ROOT import TGraphErrors
+
+    def _merge_points(df, key):
+        results = []
+
+        for kt, data in df.groupby('kT'):
+            errs = np.array(data[key + '_err'])
+            weights = errs ** -2
+            val = (data[key] * weights).sum() / weights.sum()
+            err = np.sqrt(1.0 / weights.sum())
+            results.append([kt, val, err])
+
+        return np.array(results).T
+
+    graphs = defaultdict(dict)
+
+    for cent, cdf in df.sort_values('kT').groupby('cent'):
+        if sysdf:
+            syscdf = sysdf[sysdf.cent==cent].sort_values('kT')
+        else:
+            syscdf = None
+
+        for r in ("Ro", "Rs", "Rl"):
+            x = []
+            y = []
+            ye = []
+            x, y, ye = _merge_points(cdf, r)
+
+            xe = np.zeros_like(x)
+            title = {'Ro': "R_{out}", 'Rs': "R_{side}", 'Rl': "R_{long}"}[r]
+
+            if syscdf:
+                graphs[r][cent]
+
+            gdata = TGraphErrors(x.size)
+            np.frombuffer(gdata.GetX(), dtype=np.float64)[:] = x
+            np.frombuffer(gdata.GetY(), dtype=np.float64)[:] = y
+            np.frombuffer(gdata.GetEY(), dtype=np.float64)[:] = ye
+
+            if syscdf:
+                gsys = TGraphErrors(x.size)
+                np.frombuffer(gsys.GetX(), dtype=np.float64)[:] = x - 0.00
+                np.frombuffer(gsys.GetY(), dtype=np.float64)[:] = y
+                np.frombuffer(gsys.GetEY(), dtype=np.float64)[:-1] = syscdf.groupby('kT')[r].std()
+                np.frombuffer(gsys.GetEX(), dtype=np.float64)[:] = 0.022
+            else:
+                gsys = None
+
+            graphs[r][cent] = (gdata, gsys)
+
+    return dict(graphs)
+
+
+class TheoryData:
+
+    def __init__(self, datafile=None):
+        from pathlib import Path
+        import json
+
+        if isinstance(datafile, str):
+            datafile = Path(datafile)
+        elif datafile is None:
+            datafile = Path("Theory-data.json")
+            if not datafile.exists():
+                datafile = Path('notebooks/Theory-data.json')
+            if not datafile.exists():
+                datafile = Path('femtofitter/Theory-data.json')
+
+        self.data = json.loads(datafile.read_text())
+        self.saved_tlines = {}
+
+    def get_tlines(self, key, centrality, temp):
+        from toolz.itertoolz import sliding_window
+        from ROOT import TLine
+        try:
+            return self.saved_tlines[(key, centrality, temp)]
+        except KeyError:
+            pass
+
+        self.saved_tlines[(key, centrality, temp)] = tlines = []
+
+        line_dict = self.data[key][centrality][temp]
+        for p1, p2 in sliding_window(2, zip(*line_dict.values())):
+            tlines.append(TLine(*p1, *p2))
+
+#         line_dict = self.data[key][centrality][temp]
+#             tlines.extend(TLine(*p1, *p2)
+#                           for p1, p2 in sliding_window(2, zip(*line_dict.values())))
+
+        return tlines
+
+    def draw_tlines(self, key, centrality, temp, color, style, width=2):
+
+        tlines = self.get_tlines(key, centrality, temp)
+
+        for tline in tlines:
+            tline.Draw()
+            tline.SetLineWidth(width)
+            tline.SetLineColor(color)
+            tline.SetLineStyle(style)
+
+
+def plot_gauss3d_theory_comparison(df,
+                                   c=None,
+                                   merge=True,
+                                   theory_data=None,
+                                   cfg_filter=None,
+                                   x_range=(0.19, 1.21),
+                                   y_range=(1.3, 8.52),
+                                   palette='colorblind'):
+    import ROOT
+    from ROOT import TCanvas, TLegend, TLine, TH1C
+
+    if c is None:
+        c = TCanvas()
+        c.Divide(2, 2)
+        c.SetCanvasSize(800, 800)
+    plot = PlotData(c)
+
+    plot.hists = hists = [TH1C("h%i"%i, "", 1000, *x_range) for i in range(3)]
+    for hist in hists:
+        hist.GetYaxis().SetRangeUser(*y_range)
+
+    if not isinstance(theory_data, TheoryData):
+        theory_data = TheoryData(theory_data)
+    plot.theory = theory_data
+
+    centralities = list(plot.theory.data['Ro'].keys())
+    assert centralities == ['00_05', '20_30', '40_50']
+
+    df = df[df.cent.isin(centralities)]
+    df = plot.df = merged_dataframe(df, theory_data.data.keys())
+
+    linestyle_lotemp = 2
+    linestyle_hitemp = 1
+
+    get_cent_color = plot.color_loader(palette)
+    get_sys_cent_color = plot.color_loader('muted', 'sys')
+    for tcolor in plot.tcolor_dict['sys']:
+        tcolor.SetAlpha(0.75)
+
+    data_tgraphs = group_df_into_tgraphs(df)
+
+#     plot.legend_cent = TLegend(0.5, 0.3, 0.745, 0.5)
+    plot.legend_cent = TLegend(0.5, 0.4, 0.9, 0.5)
+    plot.legend_cent.SetHeader('Centrality', '')
+    plot.legend_cent.SetBorderSize(0)
+    plot.legend_cent.SetNColumns(3)
+
+#     plot.legend_temp = TLegend(0.75, 0.35, 0.95, 0.5)
+    plot.legend_temp = TLegend(0.5, 0.35, 0.95, 0.20)
+    plot.legend_temp.SetHeader('T_{Freezeout}', 'C')
+    plot.legend_temp.SetBorderSize(0)
+
+    plot.temp_lines = [TLine(), TLine()]
+    plot.temp_lines[0].SetLineWidth(2)
+    plot.temp_lines[0].SetLineStyle(linestyle_hitemp)
+    plot.temp_lines[1].SetLineWidth(2)
+    plot.temp_lines[1].SetLineStyle(linestyle_lotemp)
+
+    plot.legend_temp.AddEntry(plot.temp_lines[0], '165 MeV', 'L')
+    plot.legend_temp.AddEntry(plot.temp_lines[1], '156 MeV', 'L')
+
+    for i, hist in enumerate(hists, 1):
+        c.cd(i)
+        hist.Draw()
+
+    for i, key in enumerate(['Ro', 'Rs', 'Rl'], 1):
+        c.cd(i)
+        for cent in centralities:
+            color = get_cent_color(cent)
+            theory_data.draw_tlines(key, cent, 'thi', color, linestyle_hitemp)
+            theory_data.draw_tlines(key, cent, 'tlo', color, linestyle_lotemp)
+
+    systematic_df = None
+    hist_dict = plot.hist_dicts = build_tgraphs_from_data(df, systematic_df)
+
+    for i, key in enumerate(['Ro', 'Rs', 'Rl'], 1):
+        c.cd(i)
+        for cent in centralities:
+            color = get_cent_color(cent)
+            tgraph_data, tgraph_sys = hist_dict[key][cent]
+            tgraph_data.SetLineColor(color)
+            tgraph_data.SetMarkerColor(color)
+            tgraph_data.SetMarkerSize(1.25)
+            tgraph_data.SetMarkerStyle(8)
+            tgraph_data.Draw("SAME P")
+            if tgraph_sys:
+                tgraph_sys.SetFillColor(get_sys_cent_color(cent))
+                tgraph_sys.SetFillStyle(1001)
+                tgraph_sys.SetLineColor(ROOT.kBlack)
+                tgraph_sys.Draw()
+
+            if i == 1:
+                cent_name = '%2g-%g%%' % tuple(map(int, cent.split('_')))
+                plot.legend_cent.AddEntry(tgraph_data, cent_name, 'p')
+
+    c.cd(0)
+    plot.legend_cent.Draw()
+    plot.legend_temp.Draw()
+
+    return plot
+
+    if cfg_filter:
+        df = df[df.cfg==cfg_filter].copy()
+    else:
+        df = df.copy()
+
+    df = AddRoutRsideRatio(df)
+
+    if merge:
+        df = merged_dataframe(df, ['Ro', 'Rs', 'Rl', 'lam', 'RoRs'])
+
+    plot.legend = leg = TLegend()
+
+    get_cent_color = plot.color_loader(palette)
+
+    canvas_div_params = (1, 4, 0, 0)
+    canvas_size = (500, 1200)
+
+    canvas_div_params = (2, 2)
+    canvas_size = (900, 900)
+
+    c.Divide(*canvas_div_params)
+    c.SetCanvasSize(*canvas_size)
+
+    for i in range(4):
+        pad = c.cd(i+1)
+        pad.SetTickx(1)
+        pad.SetTicky(1)
+
+    keys = ['Ro', 'Rs', 'Rl', 'RoRs']
+    title_map = {
+        'Ro': 'R_{out}',
+        'Rs': 'R_{side}',
+        'Rl': 'R_{long}',
+        'RoRs': 'R_{out} / R_{side}',
+    }
+
+    XRANGE = 0.18, 1.02
+    YRANGE = 1.23, 9.3
+
+    yranges = [
+        YRANGE,
+        YRANGE,
+        YRANGE,
+        (0.45, 1.65),
+    ]
+
+    titles = [title_map[key] for key in keys]
+
+    plot.axhists = [ROOT.TH1C('h%d'%i, f'{title}; k_{{T}} GeV; {title}', 1000, *XRANGE)
+                    for i, title in enumerate(titles)]
+
+    c.SetFillColor(ROOT.kGreen)
+
+    plot.run2_graphs = []
+
+    for i, hist in enumerate(plot.axhists):
+        xax, yax = hist.GetXaxis(), hist.GetYaxis()
+        yax.SetRangeUser(*yranges[i])
+        yax.SetNdivisions(909)
+        xax.SetNdivisions(509)
+
+        xax.SetLabelSize(0.06)
+        yax.SetLabelSize(0.065)
+        xax.SetTitleOffset(1.1)
+
+    for i, key in enumerate(keys, 1):
+        pad = c.cd(i)
+        hist = plot.axhists[i-1]
+        hist.Draw()
+        run1_graphs = run1_graphdict[key]
+
+        for graph, cent in zip(run1_graphs, run1_cents):
+            graph.SetMarkerColor(get_cent_color(cent))
+            graph.SetMarkerSize(1.2)
+            graph.Draw("SAME P")
+
+        for cent, cdf in df.groupby('cent'):
+            run2_graph = series_to_TGraphErrors(cdf, key)
+            run2_graph.SetMarkerColor(get_cent_color(cent))
+            run2_graph.SetMarkerSize(1.2)
+            run2_graph.SetMarkerStyle(33)
+            run2_graph.Draw("SAME P")
+            plot.run2_graphs.append(run2_graph)
+
+
 def plot_gauss3d_points(df,
                         c=None,
                         kisiel_graphs=None,
@@ -425,7 +733,6 @@ def AddRoutRsideRatio(df):
 
 
 def merged_dataframe(df, keys, xkey='kT'):
-    # ['Ro', 'Rs', 'Rl', 'lam', 'RoRs']
     merged_data = []
 
     merged_keys = ['cent', 'kT']
