@@ -40,7 +40,8 @@ def argparser():
     parser.add_argument("--ignore",
                         action='store_true',
                         help='this option is ignored')
-    parser.add_argument('grid_path')
+    parser.add_argument('grid_path',
+                        nargs='+')
     return parser
 
 
@@ -49,10 +50,15 @@ def main(argv=None):
         argv = sys.argv[1:]
     args = argparser().parse_args(argv)
 
+    for gridpath in args.grid_path:
+        run_remove(gridpath, args)
+
+    return 0
+
+
+def run_remove(grid_path, args):
     from ROOT import TGrid
     from cppyy.gbl import nullptr
-
-    grid_path = args.grid_path
 
     # lookup masterjob id
     if re.match(r'\d{10}', grid_path):
