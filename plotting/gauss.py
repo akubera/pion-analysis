@@ -441,7 +441,13 @@ def merged_dataframe(df, keys, xkey='kT'):
             for key in keys:
                 vals = kdf[key]
                 errs = kdf[key + "_err"]
+
                 weights = np.power(errs, -2, where=errs>0, out=np.zeros_like(errs))
+
+                if np.any(weights <= 0.0):
+                    print(f"Warning: non-positive errors detected for key {key}",
+                          file=sys.stderr)
+
 
                 if (w := weights.sum()) > 0:
                     mean_val = (vals * weights).sum() / w
