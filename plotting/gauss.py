@@ -4,6 +4,7 @@
 
 
 from . import PlotData
+from .systematics import calc_df_systematics
 import numpy as np
 import pandas as pd
 from functools import lru_cache
@@ -111,15 +112,6 @@ def build_TH2(x, y, ye=None, xe=None):
     x = np.array(x)
     y = np.array(y)
     graph = TH2D(f"h{abs(hash(a.tobytes())):016X}", "", x.size, x, y, xe, ye)
-    return graph
-
-
-def series_to_TH1D(series, ykey, ekey=None, xkey='kT'):
-    ekey = ekey or ykey + '_err'
-
-    graph = build_TGraphErrors(series[xkey],
-                               series[ykey],
-                               series[ekey])
     return graph
 
 
@@ -338,7 +330,7 @@ def merge_statistical_points(df, key):
     return np.array(results).T
 
 
-def build_tgraphs_from_data(df, sysdf=None):
+def build_tgraphs_from_data(df, skip_systematics=False):
     from collections import defaultdict
     from ROOT import TGraphErrors
 
@@ -357,10 +349,6 @@ def build_tgraphs_from_data(df, sysdf=None):
     graphs = defaultdict(dict)
 
     for cent, cdf in df.sort_values('kT').groupby('cent'):
-        if sysdf:
-            syscdf = sysdf[sysdf.cent==cent].sort_values('kT')
-        else:
-            syscdf = None
 
         for r in ("Ro", "Rs", "Rl"):
             x = []
@@ -371,22 +359,22 @@ def build_tgraphs_from_data(df, sysdf=None):
             xe = np.zeros_like(x)
             title = {'Ro': "R_{out}", 'Rs': "R_{side}", 'Rl': "R_{long}"}[r]
 
-            if syscdf:
-                graphs[r][cent]
-
             gdata = TGraphErrors(x.size)
             np.frombuffer(gdata.GetX(), dtype=np.float64)[:] = x
             np.frombuffer(gdata.GetY(), dtype=np.float64)[:] = y
             np.frombuffer(gdata.GetEY(), dtype=np.float64)[:] = ye
 
-            if syscdf:
+            if skip_systematics:
+                gsys = None
+            else:
+                sys_key = f"{r}_sys_err"
+                sys_err = np.array(cdf[sys_key])
+
                 gsys = TGraphErrors(x.size)
                 np.frombuffer(gsys.GetX(), dtype=np.float64)[:] = x - 0.00
                 np.frombuffer(gsys.GetY(), dtype=np.float64)[:] = y
-                np.frombuffer(gsys.GetEY(), dtype=np.float64)[:-1] = syscdf.groupby('kT')[r].std()
+                np.frombuffer(gsys.GetEY(), dtype=np.float64)[:] = sys_err
                 np.frombuffer(gsys.GetEX(), dtype=np.float64)[:] = 0.022
-            else:
-                gsys = None
 
             graphs[r][cent] = (gdata, gsys)
 
@@ -479,7 +467,7 @@ def plot_gauss3d_theory_comparison(df,
     get_cent_color = plot.color_loader(palette)
     get_sys_cent_color = plot.color_loader('muted', 'sys')
     for tcolor in plot.tcolor_dict['sys']:
-        tcolor.SetAlpha(0.75)
+        tcolor.SetAlpha(0.5)
 
     data_tgraphs = group_df_into_tgraphs(df)
 
@@ -514,8 +502,7 @@ def plot_gauss3d_theory_comparison(df,
             theory_data.draw_tlines(key, cent, 'thi', color, linestyle_hitemp)
             theory_data.draw_tlines(key, cent, 'tlo', color, linestyle_lotemp)
 
-    systematic_df = None
-    hist_dict = plot.hist_dicts = build_tgraphs_from_data(df, systematic_df)
+    hist_dict = plot.hist_dicts = build_tgraphs_from_data(df)
 
     for i, key in enumerate(['Ro', 'Rs', 'Rl'], 1):
         c.cd(i)
@@ -527,11 +514,15 @@ def plot_gauss3d_theory_comparison(df,
             tgraph_data.SetMarkerSize(1.25)
             tgraph_data.SetMarkerStyle(8)
             tgraph_data.Draw("SAME P")
+
             if tgraph_sys:
-                tgraph_sys.SetFillColor(get_sys_cent_color(cent))
+                sys_color = get_sys_cent_color(cent)
+                tgraph_sys.SetFillColor(sys_color)
+                tgraph_sys.SetLineColor(color)
+                # tgraph_sys.SetLineColor(ROOT.kGray+1)
+                # tgraph_sys.SetLineColor(ROOT.kBlack)
                 tgraph_sys.SetFillStyle(1001)
-                tgraph_sys.SetLineColor(ROOT.kBlack)
-                tgraph_sys.Draw()
+                tgraph_sys.Draw('SAME E5')
 
             if i == 1:
                 cent_name = '%2g-%g%%' % tuple(map(int, cent.split('_')))
@@ -732,40 +723,49 @@ def AddRoutRsideRatio(df):
     return df
 
 
-def merged_dataframe(df, keys, xkey='kT'):
+def calc_weighted_mean(vals, errs, warn=True):
+    weights = np.power(errs, -2, where=errs>0, out=np.zeros_like(errs))
+
+    if warn and np.any(weights <= 0.0):
+        print(f"Warning: non-positive errors detected", file=sys.stderr)
+
+    if (w := weights.sum()) > 0:
+        mean_val = (vals * weights).sum() / w
+        err = w ** -0.5
+    else:
+        mean_val = vals.mean()
+        err = 0.0
+
+    return mean_val, err
+
+
+def merged_dataframe(df, keys, xkey='kT', skip_systematics=False):
     merged_data = []
 
     merged_keys = ['cent', 'kT']
     for key in keys:
         merged_keys.append(key)
         merged_keys.append(key + '_err')
-        merged_keys.append(key + '_sys_err')
+        if not skip_systematics:
+            merged_keys.append(key + '_sys_err')
 
     for cent, cdf in df.groupby('cent'):
 
         for kt, kdf in cdf.groupby(xkey):
             values = [cent, kt]
+
+            sys_errors = (None
+                          if skip_systematics
+                          else calc_df_systematics(kdf, keys))
+
             for key in keys:
-                vals = kdf[key]
-                errs = kdf[key + "_err"]
+                val, err = calc_weighted_mean(kdf[key], kdf[key + "_err"])
 
-                weights = np.power(errs, -2, where=errs>0, out=np.zeros_like(errs))
-
-                if np.any(weights <= 0.0):
-                    print(f"Warning: non-positive errors detected for key {key}",
-                          file=sys.stderr)
-
-
-                if (w := weights.sum()) > 0:
-                    mean_val = (vals * weights).sum() / w
-                    err = w ** -0.5
-                else:
-                    mean_val = vals.mean()
-                    err = 0.0
-
-                values.append(mean_val)
+                values.append(val)
                 values.append(err)
-                values.append(vals.std())
+
+                if not skip_systematics:
+                    values.append(sys_errors[key])
 
             merged_data.append(values)
 
