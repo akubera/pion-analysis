@@ -1,0 +1,3 @@
+[submodule "femtofitter"]
+	path = femtofitter
+	url = ssh://git@gitlab.cern.ch:7999/akubera/FemtoFitter.git
