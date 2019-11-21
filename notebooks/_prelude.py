@@ -59,7 +59,6 @@ except ImportError:
     sys.path = environ['PYTHONPATH'].split(':') + sys.path
     import ROOT
 
-
 import femtofitter
 from femtofitter import FitResults, PathQuery
 
@@ -97,6 +96,9 @@ from ROOT import (
 
 # move out of notebook directory
 os.chdir(_analysis_dir)
+
+# load local plotting module
+import plotting
 
 
 # Setup ROOT Styles
