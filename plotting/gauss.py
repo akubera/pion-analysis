@@ -483,6 +483,8 @@ def plot_gauss3d_theory_comparison(df,
     for tcolor in plot.tcolor_dict['sys']:
         tcolor.SetAlpha(0.5)
 
+    plot.cent_pallets = get_cent_color, get_sys_cent_color
+
     data_tgraphs = group_df_into_tgraphs(df)
 
 #     plot.legend_cent = TLegend(0.5, 0.3, 0.745, 0.5)
@@ -828,11 +830,24 @@ def plot_gauss3d_df(df,
 
     from random import random
 
-    get_cent_color = plot.color_loader(palette)
+    if isinstance(palette, tuple):
+        cent_palette, sys_palette = palette
+    else:
+        cent_palette, sys_palette = palette, None
 
-    get_sys_cent_color = plot.color_loader('muted', 'sys')
-    for tcolor in plot.tcolor_dict['sys']:
-        tcolor.SetAlpha(0.5)
+    if callable(cent_palette):
+        get_cent_color = cent_palette
+    else:
+        get_cent_color = plot.color_loader(cent_palette)
+
+    if callable(sys_palette):
+        get_sys_cent_color = sys_palette
+    else:
+        get_sys_cent_color = plot.color_loader('muted', 'sys')
+        for tcolor in plot.tcolor_dict['sys']:
+            tcolor.SetAlpha(0.5)
+
+    plot.cent_palettes = get_cent_color, get_sys_cent_color
 
     plot.axis_hists = []
     plot.graphs = []
@@ -863,7 +878,7 @@ def plot_gauss3d_df(df,
         'Ro': ('R_{out}', YRNG),
         'Rs': ('R_{side}', YRNG),
         'Rl': ('R_{long}', YRNG),
-        'lam': ('#lambda', (0.2, 0.755555)),
+        'lam': ('#lambda', (0.2, 0.75)),
         'RoRs': ('R_{out} / R_{side}', (0.5, 1.6)),
     }
 
