@@ -812,11 +812,18 @@ def plot_gauss3d_df(df,
         c = TCanvas()
 
     plot = PlotData(c)
-#     canvas_divide(c)
-    cols = 3
-    rows = 2
+    if True:
+        cols, rows = 3, 2
+        canvas_size = 1600, 1000
+        hist_keys = ['Ro', 'Rs', 'Rl', 'lam', 'RoRs']
+    else:
+        cols, rows= 2, 3
+        canvas_size = 1000, 1600
+        hist_keys = ['Ro', 'lam', 'Rs', 'RoRs', 'Rl']
+
+
     c.Divide(cols, rows)
-    c.SetCanvasSize(1600, 1000)
+    c.SetCanvasSize(*canvas_size)
 #     c.SetFillColor(ROOT.kRed)
 
     from random import random
@@ -850,8 +857,6 @@ def plot_gauss3d_df(df,
         pad.SetTopMargin(0.1)
         pad.SetTickx(1)
         pad.SetTicky(1)
-
-    hist_keys = ['Ro', 'Rs', 'Rl', 'lam', 'RoRs']
 
     YRNG = 1.1, 7.9
     hist_info = {
@@ -928,12 +933,9 @@ def plot_gauss3d_df(df,
                     x = np.frombuffer(tgraph_sys.GetX(), np.float64, graph.GetN())
                     x += shifts[cidx]
 
-                    # ex = np.frombuffer(tgraph_sys.GetEX(), np.float64, graph.GetN())
-                    # ex = 0.0
-
-
-    pad = c.cd(5)
-    plot.axis_hists[-1].Draw()
+    RoRs_idx = hist_keys.index('RoRs')
+    pad = c.cd(RoRs_idx + 1)
+    plot.axis_hists[RoRs_idx].Draw()
 
     for cidx, (cent, cdf) in enumerate(df.groupby('cent')):
         graph = series_to_TGraphErrors(cdf, 'RoRs')
