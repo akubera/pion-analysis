@@ -99,7 +99,7 @@ os.chdir(_analysis_dir)
 
 # load local plotting module
 import plotting
-
+from plotting.fitresults import MultiFitResults
 
 # Setup ROOT Styles
 gStyle.SetOptStat(0)

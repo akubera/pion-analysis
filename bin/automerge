@@ -63,7 +63,7 @@ def main(argv=None):
         files = list(analysis_path.rglob(job_code))
         if len(files) == 0:
             print(f"Could not find an analysis directory for {job_name} "
-                   "(masterjob {masterjob})")
+                  f"(masterjob {masterjob})")
             continue
         elif len(files) > 1:
             print(f"Found multiple analyses for {job_name!r} (masterjob {masterjob})")
