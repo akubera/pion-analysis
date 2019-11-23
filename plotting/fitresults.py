@@ -38,7 +38,10 @@ class MultiFitResults:
                 df['partition'] = 1
 
         df = self.df = pd.concat(dfs).reset_index(drop=True)
-        df.loc[df.subset.isnull(), 'subset'] = ''
+        if 'subset' not in df.columns:
+            df['subset'] = ''
+        else:
+            df.loc[df.subset.isnull(), 'subset'] = ''
 
         if pd.np.any(df.duplicated()):
             raise ValueError("Paths include non-unique fit results")
@@ -181,3 +184,6 @@ class MultiFitResults:
         fg = sns.FacetGrid(df, col='kT', row='cent', hue='pair')
         fg.map_dataframe(plotmaker)
         return fg
+
+    def get_features(self):
+        pass
