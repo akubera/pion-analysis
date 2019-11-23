@@ -60,13 +60,14 @@ def main(argv=None):
         job_name = path.parent.name
         job_code, _, job_id = job_name.rpartition('-')
 
-        files = list(analysis_path.rglob(job_code))
+        files = [p for p in analysis_path.rglob(job_code) if '/.' not in str(p)]
         if len(files) == 0:
             print(f"Could not find an analysis directory for {job_name} "
                   f"(masterjob {masterjob})")
             continue
         elif len(files) > 1:
             print(f"Found multiple analyses for {job_name!r} (masterjob {masterjob})")
+            pprint(files)
             continue
 
         file_paths[(files[0].absolute(), job_id)].append(masterjob)
