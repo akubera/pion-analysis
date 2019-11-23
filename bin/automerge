@@ -23,6 +23,9 @@ def arg_parser():
     parser.add_argument("masterjob",
                         nargs='+',
                         help='masterjobs to merge')
+    parser.add_argument("--analysis-path",
+                        default=None,
+                        help='masterjobs to merge')
     return parser
 
 
@@ -54,7 +57,9 @@ def main(argv=None):
         else:
             paths.append(Path(jid) / 'analysis.sh')
 
-    analysis_path = Path(environ.get("FEMTOANALYSIS_PATH", "analyses"))
+    default_apath = "~/Physics/pion-analysis/analyses"
+    apath = args.analysis_path or environ.get("FEMTOANALYSIS_PATH", default_apath)
+    analysis_path = Path(apath).expanduser()
 
     for path, masterjob in zip(paths, masterjobs):
         job_name = path.parent.name

@@ -73,6 +73,18 @@ class MultiFitResults:
 
         return df
 
+    def remove_unfit_lambdas(self, limit=0.95, *, inplace=True):
+        if 'lam' not in self.df.columns:
+            print("lambda not in this fit result", file=sys.stderr)
+            return
+
+        bad_rows = self.df.lam >= limit
+        df = self.df[~bad_rows].reset_index(drop=True)
+        if inplace:
+            self.df = df
+
+        return df
+
     @classmethod
     def range_reduce(cls, some_dict):
         """
@@ -186,4 +198,8 @@ class MultiFitResults:
         return fg
 
     def get_features(self):
-        pass
+        raise NotImplementedError
+
+    def merge_dataframe(self):
+        raise NotImplementedError
+

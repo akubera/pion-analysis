@@ -331,9 +331,22 @@ def merge_statistical_points(df, key):
     return np.array(results).T
 
 
-def build_tgraphs_from_data(df, skip_systematics=False):
+def build_tgraphs_from_data(df, keys=None, skip_systematics=False, title_dict=None):
     from collections import defaultdict
     from ROOT import TGraphErrors
+
+    if keys is None:
+        keys = ("Ro", "Rs", "Rl")
+
+    if title_dict is None:
+        title_dict = {'Ro': "R_{out}",
+                      'Rs': "R_{side}",
+                      'Rl': "R_{long}",
+                      'lam': "#lambda"}
+
+    missing_titles = set(keys) - set(title_dict.keys())
+    if missing_titles:
+        raise ValueError(f"Title dict missing keys: {missing_titles}")
 
     def _merge_points(df, key):
         results = []
@@ -351,14 +364,14 @@ def build_tgraphs_from_data(df, skip_systematics=False):
 
     for cent, cdf in df.sort_values('kT').groupby('cent'):
 
-        for r in ("Ro", "Rs", "Rl"):
+        for r in keys:
             x = []
             y = []
             ye = []
             x, y, ye = _merge_points(cdf, r)
 
             xe = np.zeros_like(x)
-            title = {'Ro': "R_{out}", 'Rs': "R_{side}", 'Rl': "R_{long}"}[r]
+            title = [r]
 
             gdata = TGraphErrors(x.size)
             np.frombuffer(gdata.GetX(), dtype=np.float64)[:] = x
@@ -372,10 +385,10 @@ def build_tgraphs_from_data(df, skip_systematics=False):
                 sys_err = np.array(cdf[sys_key])
 
                 gsys = TGraphErrors(x.size)
-                np.frombuffer(gsys.GetX(), dtype=np.float64)[:] = x - 0.00
+                np.frombuffer(gsys.GetX(), dtype=np.float64)[:] = x - 0.004
                 np.frombuffer(gsys.GetY(), dtype=np.float64)[:] = y
                 np.frombuffer(gsys.GetEY(), dtype=np.float64)[:] = sys_err
-                np.frombuffer(gsys.GetEX(), dtype=np.float64)[:] = 0.022
+                np.frombuffer(gsys.GetEX(), dtype=np.float64)[:] = 0.012
 
             graphs[r][cent] = (gdata, gsys)
 
@@ -469,6 +482,8 @@ def plot_gauss3d_theory_comparison(df,
     get_sys_cent_color = plot.color_loader('muted', 'sys')
     for tcolor in plot.tcolor_dict['sys']:
         tcolor.SetAlpha(0.5)
+
+    plot.cent_pallets = get_cent_color, get_sys_cent_color
 
     data_tgraphs = group_df_into_tgraphs(df)
 
@@ -634,7 +649,6 @@ def plot_gauss3d_points(df,
 
     if not isinstance(df, dict):
         fit_data = group_df_into_tgraphs(df)
-#         print(fit_data)
     else:
         fit_data = df
 
@@ -778,6 +792,7 @@ def plot_gauss3d_df(df,
                     cfg_filter=None,
                     c=None,
                     palette='colorblind',
+                    systematics=True,
                     marker_size=1.2,
                     marker_style=21,
                     shift=0.03):
@@ -799,26 +814,40 @@ def plot_gauss3d_df(df,
         c = TCanvas()
 
     plot = PlotData(c)
-#     canvas_divide(c)
-    cols = 3
-    rows = 2
+    if True:
+        cols, rows = 3, 2
+        canvas_size = 1600, 1000
+        hist_keys = ['Ro', 'Rs', 'Rl', 'lam', 'RoRs']
+    else:
+        cols, rows= 2, 3
+        canvas_size = 1000, 1600
+        hist_keys = ['Ro', 'lam', 'Rs', 'RoRs', 'Rl']
+
+
     c.Divide(cols, rows)
-    c.SetCanvasSize(1600, 1000)
+    c.SetCanvasSize(*canvas_size)
 #     c.SetFillColor(ROOT.kRed)
 
     from random import random
 
-    tcolors = plot.tcolors = [ROOT.TColor(*rgb)
-                              for rgb in sns.color_palette(palette)]
-    colors = [tcolor.GetNumber() for tcolor in tcolors]
-    color_it = iter(colors)
+    if isinstance(palette, tuple):
+        cent_palette, sys_palette = palette
+    else:
+        cent_palette, sys_palette = palette, None
 
-    centrality_colors = {}
+    if callable(cent_palette):
+        get_cent_color = cent_palette
+    else:
+        get_cent_color = plot.color_loader(cent_palette)
 
-    def centrality_color(cent):
-        if cent not in centrality_colors:
-            centrality_colors[cent] = next(color_it)
-        return centrality_colors[cent]
+    if callable(sys_palette):
+        get_sys_cent_color = sys_palette
+    else:
+        get_sys_cent_color = plot.color_loader('muted', 'sys')
+        for tcolor in plot.tcolor_dict['sys']:
+            tcolor.SetAlpha(0.5)
+
+    plot.cent_palettes = get_cent_color, get_sys_cent_color
 
     plot.axis_hists = []
     plot.graphs = []
@@ -844,14 +873,12 @@ def plot_gauss3d_df(df,
         pad.SetTickx(1)
         pad.SetTicky(1)
 
-    hist_keys = ['Ro', 'Rs', 'Rl', 'lam', 'RoRs']
-
     YRNG = 1.1, 7.9
     hist_info = {
         'Ro': ('R_{out}', YRNG),
         'Rs': ('R_{side}', YRNG),
         'Rl': ('R_{long}', YRNG),
-        'lam': ('#lambda', (0.0, 0.6)),
+        'lam': ('#lambda', (0.2, 0.75)),
         'RoRs': ('R_{out} / R_{side}', (0.5, 1.6)),
     }
 
@@ -873,7 +900,16 @@ def plot_gauss3d_df(df,
         yax.SetRangeUser(*y_range)
         plot.axis_hists.append(axh)
 
+    title_dict = {key: title for key, (title, *_) in hist_info.items()}
+
+    plot.hist_dicts = build_tgraphs_from_data(df,
+                                              keys=hist_keys,
+                                              title_dict=title_dict)
+
     shifts = shift * np.linspace(-1.0, 1.0, len(df.cent.unique()))
+
+    ROOT.gStyle.SetErrorX(0)
+    ROOT.gROOT.ForceStyle()
 
     for i, key in enumerate(hist_keys, 1):
         pad = c.cd(i)
@@ -881,13 +917,15 @@ def plot_gauss3d_df(df,
 
         for cidx, (cent, cdf) in enumerate(df.groupby('cent')):
 
-            graph = series_to_TGraphErrors(cdf, key)
+            # graph = series_to_TGraphErrors(cdf, key)
+            graph, tgraph_sys = plot.hist_dicts[key][cent]
             if shift:
                 x = np.frombuffer(graph.GetX(), np.float64, graph.GetN())
                 x += shifts[cidx]
 
-            graph.SetMarkerColor(centrality_color(cent))
-            graph.SetLineColor(centrality_color(cent))
+            color = get_cent_color(cent)
+            graph.SetMarkerColor(color)
+            graph.SetLineColor(color)
             graph.SetMarkerStyle(marker_style)
             graph.SetMarkerSize(marker_size)
             graph.Draw("SAME P")
@@ -897,8 +935,22 @@ def plot_gauss3d_df(df,
             if i == 1:
                 legend.AddEntry(graph, f"{cent.replace('_', '-')}%", 'P')
 
-    pad = c.cd(5)
-    plot.axis_hists[-1].Draw()
+            if tgraph_sys:
+                sys_color = get_sys_cent_color(cent)
+                tgraph_sys.SetFillColor(sys_color)
+                tgraph_sys.SetLineColor(color)
+                # tgraph_sys.SetLineColor(ROOT.kGray+1)
+                # tgraph_sys.SetLineColor(ROOT.kBlack)
+                tgraph_sys.SetFillStyle(1001)
+                tgraph_sys.Draw('SAME []')
+
+                if shift:
+                    x = np.frombuffer(tgraph_sys.GetX(), np.float64, graph.GetN())
+                    x += shifts[cidx]
+
+    RoRs_idx = hist_keys.index('RoRs')
+    pad = c.cd(RoRs_idx + 1)
+    plot.axis_hists[RoRs_idx].Draw()
 
     for cidx, (cent, cdf) in enumerate(df.groupby('cent')):
         graph = series_to_TGraphErrors(cdf, 'RoRs')
@@ -908,8 +960,9 @@ def plot_gauss3d_df(df,
         # graph = series_to_TGraphErrors(cdf, 'RoRs')
         plot.graphs.append(graph)
 
-        graph.SetMarkerColor(centrality_color(cent))
-        graph.SetLineColor(centrality_color(cent))
+        color = get_cent_color(cent)
+        graph.SetMarkerColor(color)
+        graph.SetLineColor(color)
         graph.SetMarkerStyle(marker_style)
         graph.SetMarkerSize(marker_size)
 
@@ -918,9 +971,6 @@ def plot_gauss3d_df(df,
     plot.lines.append(ROOT.TLine(KT_RANGE[0], 1.0, KT_RANGE[1], 1.0))
     plot.lines[-1].SetLineStyle(2)
     plot.lines[-1].Draw()
-
-#     pad = c.cd(1)
-#     pad.SetLeftMargin(100.01)
 
     return plot
 
