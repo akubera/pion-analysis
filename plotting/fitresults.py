@@ -15,7 +15,6 @@ from femtofitter import FitResults
 
 class MultiFitResults:
 
-
     def __init__(self, pattern, datapath='fitresults'):
         self._datapath = Path(datapath)
         assert self._datapath.exists()
@@ -202,4 +201,3 @@ class MultiFitResults:
 
     def merge_dataframe(self):
         raise NotImplementedError
-
