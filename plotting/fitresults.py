@@ -17,12 +17,14 @@ class MultiFitResults:
 
 
     def __init__(self, pattern, datapath='fitresults'):
-        self.datapath = Path(datapath)
-        if isinstance(pattern, str):
-            self.paths = list(self.datapath.glob(pattern))
+        self._datapath = Path(datapath)
+        assert self._datapath.exists()
+
+        if isinstance(pattern, (str, Path)):
+            self.paths = list(self._datapath.rglob(pattern))
         else:
             self.paths = [filepath
-                          for glob in map(self.datapath.glob, pattern)
+                          for glob in map(self._datapath.glob, pattern)
                           for filepath in glob]
 
         self.frs = fr_list = [FitResults(filename) for filename in self.paths]
