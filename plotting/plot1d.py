@@ -1,15 +1,11 @@
+#
+# pion-analysis/plotting/plot1d.py
+#
 
+from . import PlotData
+from plotting.fitresults import MultiFitResults
 import numpy as np
 import pandas as pd
-
-
-class PlotData:
-
-    def __init__(self, canvas=None):
-        self.canvas = canvas
-
-    def Draw(self, opts=''):
-        self.canvas.Draw(opts)
 
 
 def merge_points(df):
@@ -427,4 +423,14 @@ def plot_projected_fits(fr,
     return plot
 
 
+class PlotResults1D:
 
+    def __init__(self, fr):
+        if not isinstance(fr, MultiFitResults):
+            fr = MultiFitResults(fr)
+
+        self.fr = fr
+
+    def plot(self, centrality, kts=None):
+        df = self.fr.df
+        df = df[df.cent==centrality]
