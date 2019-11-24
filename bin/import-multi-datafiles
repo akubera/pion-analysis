@@ -14,6 +14,7 @@ def arg_parser():
     from argparse import ArgumentParser
     parser = ArgumentParser()
     parser.add_argument("jobid", nargs='+')
+    parser.add_argument("--train", action='store_true')
     return parser
 
 
@@ -21,6 +22,41 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
     args = arg_parser().parse_args(argv)
+
+    if args.train:
+        load_train_job(args)
+    else:
+        load_grid_job(args)
+
+def load_train_job(args):
+    datapath = Path("~/alice/data").expanduser()
+    print(datapath)
+
+    file_globs = [datapath.rglob(f"*-{trainid}-*-*field.root")
+                  for trainid in args.jobid]
+
+    file_pattern = r"""
+            \w+
+            \-(?P<trainid>[0-9]+)
+            .+?
+            \-child_(?P<part>[0-9]+)
+            \-[a-z]+field
+            \.root$"""
+
+    # for file in map(list, file_globs):
+    for file in chain.from_iterable(file_globs):
+        if (m := re.search(file_pattern, file.name, re.X)):
+            part = m.group('part')
+            dataid = m.group('trainid')
+            sp.run(['femtofitter/bin/import-datafile',
+                    file,
+                    '--update',
+                    '-o', f'data/{dataid}-{part}.root'])
+        else:
+            print(file.name)
+
+
+def load_grid_job(args):
     datapath = Path("~/Physics/data/alice").expanduser()
 
     file_globs = [datapath.rglob(f"A*{dataid}-*.root")
