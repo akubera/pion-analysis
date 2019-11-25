@@ -28,11 +28,12 @@ def merge_points(df):
     return data
 
 
-def build_1D_fit_pair(series, tfile=None):
+def build_1D_fit_pair(series, tfile=None, ignore_mrc=False):
     """
     Build a fitter and fit results from
     """
     import ROOT
+    from ROOT import TFile, TDirectory, Data1D
 
     fitter_classname = {
        "Gauss1D": "Fitter1DGauss",
@@ -41,25 +42,28 @@ def build_1D_fit_pair(series, tfile=None):
        "Levy1DPolyBg": "Fitter1DLevy",
     }[series.fitter]
 
-    FitterClass = getattr(ROOT, fitter_classname)
+    FitterClass: type = getattr(ROOT, fitter_classname)
 
     if isinstance(tfile, str):
         if tfile not in _file_cache:
-            _file_cache[tfile] = ROOT.TFile.Open(tfile)
+            _file_cache[tfile] = TFile.Open(tfile)
         tfile = _file_cache[tfile]
 
-    pq = PathQuery.From(series)
-    tdir = tfile.Get(pq.as_path())
+    if isinstance(tfile, TFile):
+        pq = PathQuery.From(series)
+        tdir = tfile.Get(pq.as_path())
+    elif isinstance(tfile, TDirectory):
+        tdir = tfile
 
     fit_result = FitterClass.FitResult(series)
 
-#     data = tfile.
+    data = Data1D.From(tdir)
+    fitter = FitterClass(data)
 
     load_fsi(fitter, series.fsi)
-    load_mrc(fitter, series.mrc)
-#         tfile
+    if not ignore_mrc:
+        load_mrc(fitter, series.mrc)
 
-    # ftr
     return fitter, fit_result
 
 
@@ -477,6 +481,7 @@ class PlotResults1D:
 
     def plot(self,
              centrality,
+             df=None,
              kts=None,
              pad=None,
              canvas_size=(500, 900),
@@ -491,7 +496,9 @@ class PlotResults1D:
             'Levy1DPolyBg': 'Fitter1DLevyPolyBg',
         }
 
-        df = self.fr.df
+        if df is None:
+            df = self.fr.df
+
         df = df[df.cent==centrality]
 
         if pad is None:
@@ -550,7 +557,12 @@ class PlotResults1D:
 
             series = subdf.iloc[0]
 
-            fitter, fit_result = build_1D_fit_pair(series, tfile)
+            q = PathQuery.From(series)
+            tdir = tfile.Get(q.as_path())
+
+            fitter, fit_result = build_1D_fit_pair(series, tdir, ignore_mrc)
+            cf = fitter.get_cf(fit_result)
+
 
 #             fsi_dict = load_fsi(series.fsi)
 #             fsi_dict = build_fitter(series.fsi)
