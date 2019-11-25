@@ -15,6 +15,7 @@ def arg_parser():
     parser = ArgumentParser()
     parser.add_argument("jobid", nargs='+')
     parser.add_argument("--train", action='store_true')
+    parser.add_argument("--tag")
     return parser
 
 
@@ -30,7 +31,6 @@ def main(argv=None):
 
 def load_train_job(args):
     datapath = Path("~/alice/data").expanduser()
-    print(datapath)
 
     file_globs = [datapath.rglob(f"*-{trainid}-*-*field.root")
                   for trainid in args.jobid]
@@ -48,10 +48,11 @@ def load_train_job(args):
         if (m := re.search(file_pattern, file.name, re.X)):
             part = m.group('part')
             dataid = m.group('trainid')
+            file_tag = args.tag or dataid
             sp.run(['femtofitter/bin/import-datafile',
                     file,
                     '--update',
-                    '-o', f'data/{dataid}-{part}.root'])
+                    '-o', f'data/{file_tag}-{part}.root'])
         else:
             print(file.name)
 
@@ -73,10 +74,11 @@ def load_grid_job(args):
         if (m := re.search(file_pattern, file.name, re.X)):
             part = m.group('part')
             dataid = m.group('id')
+            file_tag = args.tag or dataid
             sp.run(['femtofitter/bin/import-datafile',
                     file,
                     '--update',
-                    '-o', f'data/{dataid}-{part}.root'])
+                    '-o', f'data/{file_tag}-{part}.root'])
 
 
 if __name__ == "__main__":
