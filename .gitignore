@@ -10,6 +10,7 @@
 
 *.xml
 *.json
+*.feather
 
 __pycache__/
 *.py[cod]
