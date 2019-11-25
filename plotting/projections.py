@@ -26,10 +26,13 @@ def load_datafile(fr):
     return tfile
 
 
-def deserialize_args(args: str) -> Tuple[Any]:
-    
+def deserialize_args(args: str) -> Tuple:
+    """
+    Turn argument string into tuple to pass to the thing
+    """
+
     from ast import literal_eval
-    
+
     if args == '':
         return ()
 
@@ -62,7 +65,7 @@ def load_fsi(fitter, fsi_str):
     m = re.match(r'(?P<cls>\w+)\[(?P<args>[^\]]+)\]', fsi_str)
     if not m:
         raise ValueError(f"Could not parse fsi string: {fsi_str!r}")
-       
+
     import ROOT
 #     filename = m.group('file')
     # if filename not in file_cache:
@@ -70,7 +73,7 @@ def load_fsi(fitter, fsi_str):
 
     #fsi_file = file_cache[filename]
 #     fsi_file = TFile.Open(filename)
-    
+
     FsiClass = getattr(ROOT, m.group('cls'))
     fsi_args = deserialize_args(m.group('args'))
 
@@ -85,6 +88,9 @@ def load_mrc(fitter, mrc_str):
     import ROOT
     from ROOT import TFile
     regex = re.compile(r"(?P<classname>\w+)\[(?P<filename>[^:]+):(?P<path>[^\]]+)\]")
+
+    if not mrc_str:
+        return
 
     m = regex.match(mrc_str)
     if not m:
@@ -109,7 +115,7 @@ def load_mrc(fitter, mrc_str):
 def plot_fit_projections(fitresult,
                          centrality,
                          cfg=None,
-                         kt=None, 
+                         kt=None,
                          pair='pip',
                          fclassname=None,
                          ignore_mrc=False,
@@ -142,20 +148,20 @@ def plot_fit_projections(fitresult,
         cfg = fitresult.config.iloc[0].name
     elif isinstance(cfg, int):
         cfg = fitresult.config.iloc[cfg].name
-        
+
     df = df[df.cfg==cfg]
     if df.empty:
         raise ValueError(f"No cfg {cfg!r}")
 
     if isinstance(kt, str):
         kt = (kt, )
-        
+
     if kt:
         df = df[df.kt.isin(kt)]
-        
+
     if df.empty:
         raise ValueError(f"No kt in {kt!r}")
-    
+
     tfile = load_datafile(fitresult)
 
     if pad is None:
@@ -173,14 +179,14 @@ def plot_fit_projections(fitresult,
         'y': (TH3.ProjectionY, TH3.GetXaxis, TH3.GetZaxis),
         'z': (TH3.ProjectionZ, TH3.GetXaxis, TH3.GetYaxis),
     }
-    
+
     for j, series in enumerate(rows, 1):
         pq = PathQuery.From(series)
         tdir = tfile.Get(pq.as_path())
-        
+
         data = Data3D.From(tdir, series.fitrange)
         fitter = FitterClass(data)
-        
+
         fit_result = FitterClass.FitResult(series)
         fit_params = fit_result.as_params()
 
@@ -190,13 +196,13 @@ def plot_fit_projections(fitresult,
         load_fsi(fitter, series.fsi)
         if series.mrc and not ignore_mrc:
             load_mrc(fitter, series.mrc)
-            
+
         cf = fitter.get_cf(fit_params)
         if fitter.mrc:
             cf_den = fitter.mrc.GetSmearedDenLike(cf)
         else:
             cf_den = den
-            
+
         cf.Multiply(cf_den)
 
         fit_params.Normalize(num)
@@ -215,7 +221,7 @@ def plot_fit_projections(fitresult,
 
             range1 = get_range(num, getax1)
             range2 = get_range(num, getax2)
-  
+
             n = project(num, f"n{ax}", *range1, *range2)
             d = project(den, f"d{ax}", *range1, *range2)
 
@@ -230,7 +236,7 @@ def plot_fit_projections(fitresult,
             ratio.SetStats(0)
             ratio.SetLineWidth(2)
             ratio.DrawCopy("HE")
-            
+
             cf_p.SetLineColor(ROOT.kRed)
             cf_p.SetLineWidth(2)
             cf_p.SetTitle("")
