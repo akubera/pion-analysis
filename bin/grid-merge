@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+#
+# grid-merge
+#
+
+import os
+import sys
+import shutil
+import asyncio
+import asyncio.subprocess as sp
+
+from pathlib import Path
+from pprint import pprint
+from tempfile import TemporaryDirectory
+from concurrent.futures import ProcessPoolExecutor
+
+from tqdm import tqdm
+
+
+def arg_parser():
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("job_dir",
+                        nargs="?",
+                        help="")
+    parser.add_argument("--dest-prefix",
+                        type=Path,
+                        default="~/Physics/data/akubera",
+                        help="")
+    parser.add_argument("--grid-prefix",
+                        type=Path,
+                        default="/alice/cern.ch/user/a/akubera",
+                        help="")
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+
+    if args.job_dir is None:
+        job_dir = Path().absolute()
+    else:
+        job_dir = Path(args.job_dir).absolute()
+
+    if not job_dir.name.startswith('job-'):
+        print(f"Bad job dir {job_dir.name}", file=sys.stderr)
+        return 1
+
+    dest_prefix = args.dest_prefix.expanduser().absolute()
+    grid_prefix = Path(os.path.expandvars(args.grid_prefix.expanduser())).absolute()
+
+    asyncio.run(fetch_and_clear(job_dir, dest_prefix, grid_prefix))
+    return 0
+
+
+async def fetch_and_clear(job_dir, dest_prefix: Path, grid_prefix: Path):
+    """
+    Fetches and clears
+    """
+
+    if not job_dir.exists():
+        job_dir.mkdir(parents=True)
+
+    os.chdir(job_dir)
+
+    local_filelist = Path("alienSyncLogs/localFile.list")
+    if not local_filelist.exists():
+        grid_dir = grid_prefix / job_dir.name
+        await rsync_files(grid_dir)
+
+    assert local_filelist.exists()
+
+    downloaded_files = [Path(line)
+                        for line in local_filelist.read_text().split('\n')
+                        if line]
+
+    dest_file = Path(downloaded_files[0].name)
+
+    final_output_path_str = f"{dest_prefix}/{job_dir.name}/output/{dest_file}"
+    final_output_path = Path(final_output_path_str).expanduser()
+
+    if final_output_path.exists():
+        print("Final output already exists.")
+        return 0
+
+    if dest_file.exists():
+        print("Merged file already exists. Copying to final output path.")
+        raise NotImplementedError
+        # final_output_path.mkdir(parents_ok=True)
+        # shutil.copy2(dest_file, final_output_path)
+        return 0
+
+    print(f"Merging into {dest_file}")
+
+    with TemporaryDirectory() as tmpdir:
+        if len(downloaded_files) < 4:
+            input_lists = [downloaded_files]
+        else:
+            n = merge_list_count = min(len(downloaded_files) // 3, 8)
+            input_lists = [downloaded_files[i::n] for i in range(n)]
+
+        output_list = [f'{tmpdir}/MergeResult{i:02d}.root'
+                       for i, _ in enumerate(input_lists)]
+
+        loop = asyncio.get_event_loop()
+        from asyncio import wait, FIRST_COMPLETED
+
+        with ProcessPoolExecutor(max_workers=len(input_lists)) as exe:
+
+            pending = [loop.run_in_executor(exe, merge_tfiles, ofile, ifiles)
+                       for ofile, ifiles in zip(output_list, input_lists)]
+            merge_statuses = []
+
+            with tqdm(total=len(pending)) as pbar:
+                while pending:
+                    done, pending = await wait(pending,
+                                               return_when=FIRST_COMPLETED)
+                    merge_statuses.extend([r.result() for r in done])
+                    pbar.update(len(done))
+
+        if not all(merge_statuses):
+            print("Failed Merging")
+            return 1
+
+        # for input_file in downloaded_files:
+        merge_tfiles(dest_file, output_list)
+        assert dest_file.exists()
+
+    print(f"Copy result to output")
+    final_output_path.mkdir(parents_ok=True)
+    shutil.copy2(dest_file, final_output_path)
+    final_output_path.chmod(0o444)
+
+    print(f"removing merged files from grid")
+    for path in tqdm(downloaded_files):
+        grid_path = f"/{path.relative_to('.').parent}"
+        rmdir_args = 'gbbox', 'rmdir', path
+        alien_rm = await sp.create_subprocess_exec(*rmdir_args,
+                                                   stdout=sp.PIPE,
+                                                   stderr=sp.PIPE)
+
+        await alien_rm.wait()
+
+    print(f"removing local files")
+    for path in tqdm(downloaded_files):
+        path.unlink()
+        while (path := path.parent).name != 'output':
+            try:
+                path.rmdir()
+            except OSError:
+                break
+
+    return 0
+
+
+def merge_tfiles(dest, file_list, quiet=True):
+    from ROOT import TFileMerger
+    file_merger = TFileMerger()
+    file_merger.OutputFile(str(dest))
+    file_merger.SetPrintLevel(0)
+
+    for path in file_list:
+        file_merger.AddFile(str(path), False)
+
+    merge_retcode = file_merger.Merge()
+    if not merge_retcode:
+        return False
+
+    return True
+
+
+async def rsync_files(grid_dir):
+    print(f"Syncing ROOT files from {grid_dir}")
+    find_command = f"alienFindCommand='alien_find {grid_dir} A*.root'"
+    rsync = await sp.create_subprocess_exec('alien_rsync.sh', find_command,
+                                            stdout=sp.PIPE, stderr=sp.PIPE)
+
+    with tqdm(total=float('inf')) as progress_bar:
+        while rsync.returncode is None:
+            output = await rsync.stdout.readline()
+            if output.startswith(b"eval 'alien_find"):
+                progress_bar.set_description("finding files")
+            progress_bar.update(1)
+
+    if rsync.returncode != 0:
+        rsync_err = await rsync.stderr.read()
+        Path("ERROR.log").write_bytes(rsync_err)
+        rsync_lock = Path("alienSyncLogs/runningNow.lock")
+        if rsync_lock.exists():
+            rsync_lock.unlink()
+        raise RuntimeError("rsync error")
+
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())

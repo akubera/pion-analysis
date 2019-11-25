@@ -119,4 +119,3 @@ gStyle.SetOptStat(0)
 # gStyle.SetPadRightMargin(0.25)
 
 gROOT.ForceStyle()
-
