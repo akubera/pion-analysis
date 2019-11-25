@@ -39,7 +39,7 @@ def build_1D_fit_pair(series, tfile=None, ignore_mrc=False):
        "Gauss1D": "Fitter1DGauss",
        "Gauss1DPolyBg": "Fitter1DGaussPolyBg",
        "Levy1D": "Fitter1DLevy",
-       "Levy1DPolyBg": "Fitter1DLevy",
+       "Levy1DPolyBg": "Fitter1DLevyPolyBg",
     }[series.fitter]
 
     FitterClass: type = getattr(ROOT, fitter_classname)
@@ -486,10 +486,12 @@ class PlotResults1D:
              pad=None,
              canvas_size=(500, 900),
              xmax=0.23,
+             yrange=(0.8, 1.36),
              ignore_mrc=False,
              ):
         import ROOT
         from ROOT import TPad, TCanvas
+        from cppyy.gbl import nullptr
 
         fitter_classmap = {
             'Gauss1DPolyBg': 'Fitter1DGaussPolyBg',
@@ -508,7 +510,7 @@ class PlotResults1D:
         plot = PlotData(pad)
 
         # pad.SetFillColor(ROOT.kRed)
-        pad.SetFillColor(ROOT.kBlack)
+        # pad.SetFillColor(ROOT.kBlack)
 
         if kts is None:
             kts = ['0.2_0.3', '0.3_0.4']
@@ -527,8 +529,10 @@ class PlotResults1D:
 
         plot.pads = []
         plot.hists = []
+        plot.hists_fit = []
         plot.cf_data_hists = []
         plot.lines = []
+        plot.texts = []
         plot.tfiles = {}
 
         filename = self.fr.frs[0].filename
@@ -543,10 +547,14 @@ class PlotResults1D:
             yfrachi = 1.0 - TOP_BUFFER - j * (canvas_height_frac + YSPACE)
             yfraclo = yfrachi - canvas_height_frac
 
+            # extend yfrac for the pad
+            if kt == kts[-1]:
+                yfraclo -= 0.008
+
             subpad = TPad(f'pad{j:02d}', '',
                           0.05, yfraclo, 0.96, yfrachi)
             subpad.Draw()
-            subpad.SetFillColor(get_color(kt))
+            # subpad.SetFillColor(get_color(kt))
             subpad.cd()
             subpad.SetTopMargin(0.0)
             subpad.SetBottomMargin(0.0)
@@ -561,30 +569,63 @@ class PlotResults1D:
             tdir = tfile.Get(q.as_path())
 
             fitter, fit_result = build_1D_fit_pair(series, tdir, ignore_mrc)
-            cf = fitter.get_cf(fit_result)
-
-
-#             fsi_dict = load_fsi(series.fsi)
-#             fsi_dict = build_fitter(series.fsi)
 
             num, den = map(tdir.Get, ("num", "den"))
             ratio = num.Clone('ratio%02d' % j)
             ratio.Divide(num, den)
-            fit_result.Normalize(ratio)
 
-            # ratio.GetXaxis().SetRangeUser(0.14, 0.34)
-            ratio.Draw()
+            fitcf = fitter.get_cf(fit_result)
+            fitcf.SetLineColor(ROOT.kRed)
+
+            fit_result.Normalize(ratio)
+            fit_result.Normalize(fitcf)
+            ratio.SetDirectory(nullptr)
+            fitcf.SetDirectory(nullptr)
+
+            ratio.SetLineWidth(2)
+
+            ratio.Draw('HE')
+            fitcf.Draw("SAME")
 
             plot.hists.extend([num, den, ratio])
             plot.cf_data_hists.append(ratio)
+            plot.hists_fit.append(fitcf)
+
+            kt_lbl_str = 'k_{T} = %s (GeV)' % series.kt.replace('_', '-')
+            kt_lbl = ROOT.TLatex(0.19, 0.83, kt_lbl_str)
+            # kt_lbl = ROOT.TLatex(0.5, 0.10, kt_lbl_str)
+            # kt_lbl.SetNDC()
+            kt_lbl.SetTextSize(0.1)
+            kt_lbl.SetTextFont(52)
+
+            kt_lbl.Draw('same')
+            plot.texts.append(kt_lbl)
 
             # subpad.SetLineColor(ROOT.kBlack)
             # subpad.SetBoxlimrderMode(5)
             # subpad.SetBorderSize(2)
             plot.pads.append(subpad)
 
+            plot.hists = []
+
+
         for hist in plot.cf_data_hists:
-            hist.GetXaxis().SetRangeUser(0.0, xmax)
-            hist.GetYaxis().SetRangeUser(0.85, 1.34)
+            xax, yax = hist.GetXaxis(), hist.GetYaxis()
+            xax.SetRangeUser(0.0, xmax)
+            yax.SetRangeUser(*yrange)
+            yax.SetLabelSize(0.08)
+            yax.SetNdivisions(804)
+            xax.SetNdivisions(808)
+            xax.SetLabelSize(0.08)
+
+        bottom_pad = plot.pads[-1]
+        bottom_pad.SetBottomMargin(0.1)
+        # # print(bottom_pad.BBoxY2())
+        # bbox = bottom_pad.GetBBox()
+        # print('>', bbox.fX, bbox.fWidth, bbox.fY, bbox.fHeight)
+        # # plot.pads[-1].SetBBoxY2(100)
+        # bottom_pad.SetBBoxY2(bbox.fY + 10)
+        # bbox = bottom_pad.GetBBox()
+        # print('>', bbox.fX, bbox.fWidth, bbox.fY, bbox.fHeight)
 
         return plot
