@@ -2,11 +2,15 @@
 # pion-analysis/plotting/plot1d.py
 #
 
+import re
 from . import PlotData
 from femtofitter import PathQuery
 from plotting.fitresults import MultiFitResults
+from .projections import load_fsi, load_mrc
 import numpy as np
 import pandas as pd
+
+_file_cache = {}
 
 
 def merge_points(df):
@@ -22,6 +26,80 @@ def merge_points(df):
 
     data = pd.DataFrame([x,y,ye], ['kT', 'radius', 'radius_err']).T
     return data
+
+
+def build_1D_fit_pair(series, tfile=None):
+    """
+    Build a fitter and fit results from
+    """
+    import ROOT
+
+    fitter_classname = {
+       "Gauss1D": "Fitter1DGauss",
+       "Gauss1DPolyBg": "Fitter1DGaussPolyBg",
+       "Levy1D": "Fitter1DLevy",
+       "Levy1DPolyBg": "Fitter1DLevy",
+    }[series.fitter]
+
+    FitterClass = getattr(ROOT, fitter_classname)
+
+    if isinstance(tfile, str):
+        if tfile not in _file_cache:
+            _file_cache[tfile] = ROOT.TFile.Open(tfile)
+        tfile = _file_cache[tfile]
+
+    pq = PathQuery.From(series)
+    tdir = tfile.Get(pq.as_path())
+
+    fit_result = FitterClass.FitResult(series)
+
+#     data = tfile.
+
+    load_fsi(fitter, series.fsi)
+    load_mrc(fitter, series.mrc)
+#         tfile
+
+    # ftr
+    return fitter, fit_result
+
+
+# def load_mrc(mrc_paths):
+#     import ROOT
+#     from ROOT import TFile
+#     mrc_ptrs = {}
+#     for mrc in mrc_paths:
+#         m = re.match(r'(?P<cls>\w+)\[(?P<file>[^:]+):(?P<path>[^\]]+)\]', mrc)
+#         d = m.groupdict()
+#         try:
+#             mrc_file = _file_cache[d['file']]
+#         except KeyError:
+#             mrc_file = _file_cache[d['file']] = TFile.Open(d['file'])
+
+#         mrc_cls = getattr(ROOT, d['cls'])
+#         mrc_tdir = mrc_file.Get(d['path'])
+#         mrc_ptrs[mrc] = mrc_cls.From(mrc_tdir)
+#     return mrc_ptrs
+
+
+# def load_fsi(fsi_paths):
+#     import ROOT
+#     from ROOT import TFile
+#     if isinstance(fsi_paths, str):
+#         fsi_paths = (fsi_paths, )
+
+#     fsi_objs = {}
+#     for fsi in fsi_paths:
+#         m = re.match(r'(?P<cls>\w+)\[(?P<file>[^\]]+)\]', fsi)
+#         d = m.groupdict()
+#         try:
+#             fsi_file = _file_cache[d['file']]
+#         except KeyError:
+#             fsi_file = _file_cache[d['file']] = TFile.Open(d['file'])
+
+#         fsi_cls = getattr(ROOT, d['cls'])
+#         fsi_objs[fsi] = fsi_cls.From(fsi_file)
+
+#     return fsi_objs
 
 
 def make_1d_plots(df, c=None):
@@ -131,7 +209,6 @@ def load_joeys_style():
 def make_1d_correlation_function(df, key, tfile=None, size=(800, 600), c=None):
     import ROOT
     from ROOT import TCanvas, TLine
-    from femtofitter import PathQuery
     if c is None:
         c = TCanvas()
         c.SetCanvasSize(*size)
@@ -179,10 +256,7 @@ def make_1d_correlation_function(df, key, tfile=None, size=(800, 600), c=None):
 
     # draw fit
     if False:
-        fitter_classname = {
-           'Gauss1D': "Fitter1DGauss",
-        }[series.fitter]
-        fitter = getattr(ROOT, fitter_classname)
+        fitter, fit_result = build_fitter_pair(series)
         print(fitter.FitResult(series))
 
     return plot
@@ -240,7 +314,6 @@ def plot_projected_fits(fr,
     """
     Plot big matrix of historams and fits
     """
-    import re
     import ROOT
     from femtofitter import PathQuery
     from ROOT import TFile, gStyle, gROOT
@@ -304,36 +377,6 @@ def plot_projected_fits(fr,
         rz.Divide(dz)
 
         return rx, ry, rz
-
-    def load_mrc(mrc_paths):
-        mrc_ptrs = {}
-        for mrc in mrc_paths:
-            m = re.match(r'(?P<cls>\w+)\[(?P<file>[^:]+):(?P<path>[^\]]+)\]', mrc)
-            d = m.groupdict()
-            try:
-                mrc_file = file_cache[d['file']]
-            except KeyError:
-                mrc_file = file_cache[d['file']] = TFile.Open(d['file'])
-
-            mrc_cls = getattr(ROOT, d['cls'])
-            mrc_tdir = mrc_file.Get(d['path'])
-            mrc_ptrs[mrc] = mrc_cls.From(mrc_tdir)
-        return mrc_ptrs
-
-    def load_fsi(fsi_paths):
-        fsi_objs = {}
-        for fsi in fsi_paths:
-            m = re.match(r'(?P<cls>\w+)\[(?P<file>[^\]]+)\]', fsi)
-            d = m.groupdict()
-            try:
-                fsi_file = file_cache[d['file']]
-            except KeyError:
-                fsi_file = file_cache[d['file']] = TFile.Open(d['file'])
-
-            fsi_cls = getattr(ROOT, d['cls'])
-            fsi_objs[fsi] = fsi_cls.From(fsi_file)
-
-        return fsi_objs
 
     df = fr.df[fr.df.cent==centrality]
 
@@ -438,6 +481,7 @@ class PlotResults1D:
              pad=None,
              canvas_size=(500, 900),
              xmax=0.23,
+             ignore_mrc=False,
              ):
         import ROOT
         from ROOT import TPad, TCanvas
@@ -470,7 +514,7 @@ class PlotResults1D:
 
         TOP_BUFFER = 0.02
         BOTTOM_BUFFER = 0.05
-        YSPACE = 0.02
+        YSPACE = 0.00
 
         canvas_height_frac = (1.0 - TOP_BUFFER - BOTTOM_BUFFER - (J - 1) * YSPACE) / J
 
@@ -480,8 +524,11 @@ class PlotResults1D:
         plot.lines = []
         plot.tfiles = {}
 
-        ftr_classname = fitter_classmap[self.fr.df.iloc[0].fitter]
-        FitterClass = getattr(ROOT, ftr_classname)
+        filename = self.fr.frs[0].filename
+        if filename not in plot.tfiles:
+            plot.tfiles[filename] = ROOT.TFile.Open(filename)
+
+        tfile = plot.tfiles[filename]
 
         for j, kt in enumerate(kts):
             pad.cd()
@@ -489,28 +536,24 @@ class PlotResults1D:
             yfrachi = 1.0 - TOP_BUFFER - j * (canvas_height_frac + YSPACE)
             yfraclo = yfrachi - canvas_height_frac
 
-            subpad = TPad('pad%d' % j,
-                          '',
+            subpad = TPad(f'pad{j:02d}', '',
                           0.05, yfraclo, 0.96, yfrachi)
             subpad.Draw()
             subpad.SetFillColor(get_color(kt))
             subpad.cd()
+            subpad.SetTopMargin(0.0)
+            subpad.SetBottomMargin(0.0)
+            subpad.SetTickx(1)
+            subpad.SetTicky(1)
 
             subdf = df[df.kt==kt]
 
             series = subdf.iloc[0]
-            pq = PathQuery.From(series)
 
-            ppath = pq.as_path()
-            fit_result = FitterClass.FitResult(series)
-            # pad.cd()
+            fitter, fit_result = build_1D_fit_pair(series, tfile)
 
-            filename = self.fr.frs[0].filename
-            if filename not in plot.tfiles:
-                tfile = plot.tfiles[filename] = ROOT.TFile.Open(filename)
-
-            path = pq.as_path()
-            tdir = tfile.Get(path)
+#             fsi_dict = load_fsi(series.fsi)
+#             fsi_dict = build_fitter(series.fsi)
 
             num, den = map(tdir.Get, ("num", "den"))
             ratio = num.Clone('ratio%02d' % j)
@@ -531,6 +574,5 @@ class PlotResults1D:
         for hist in plot.cf_data_hists:
             hist.GetXaxis().SetRangeUser(0.0, xmax)
             hist.GetYaxis().SetRangeUser(0.85, 1.34)
-
 
         return plot
