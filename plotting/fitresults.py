@@ -2,6 +2,8 @@
 # pion-analysis/plotting/fitresults.py
 #
 
+from typing import Union, Tuple
+
 import sys
 import re
 import pandas as pd
@@ -141,7 +143,7 @@ class MultiFitResults:
 
         return parts
 
-    def add_feature_strings(self, *, inplace=False):
+    def add_feature_strings(self, *, inplace=False, sort=True):
         if 'feature' in self.df.columns:
             return self.df
 
@@ -168,8 +170,21 @@ class MultiFitResults:
             feature_str = self.build_feature_string(feature_dict[cfg])
             df.loc[df.cfg==cfg, 'feature'] = feature_str
 
+        if sort:
+            df['feature_sort'] = df.feature.apply(self.split_features)
+            df.sort_values(['feature_sort', 'cent', 'kt'], inplace=True)
+            df.reset_index(drop=True, inplace=True)
+            df.drop(columns='feature_sort', inplace=True)
+
         return df
 
+    @staticmethod
+    def split_features(feature: str) -> Union[Tuple[str, float], str]:
+        name, _, val = feature.partition(':')
+        try:
+            return name, float(val)
+        except ValueError:
+            return feature
 
     def plotstuff(self, df=None, y='Ro'):
         if df is None:
