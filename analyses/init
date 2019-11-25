@@ -53,7 +53,8 @@ def main(argv=None):
     }
 
     if args.local:
-        raise NotImplementedError
+        init_local_analysis(args)
+        return
 
     from ROOT import TGrid
 
@@ -92,6 +93,25 @@ def main(argv=None):
     (local_workdir / 'settings.json').write_text(json.dumps({'analysis': analysis, 'data': data}, indent=1))
 
     print(local_workdir)
+
+
+def init_local_analysis(args):
+    import os
+    from pathlib import Path
+
+    # redirect stdout
+    sys.stdout.flush()
+    newstdout = os.dup(1)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, 1)
+    os.close(devnull)
+    sys.stdout = os.fdopen(newstdout, 'w')
+
+    from ROOT import TFile, TChain
+    input_files = TChain("aodTree")
+
+    for filename in map(str, files):
+        input_files.Add(filename)
 
 
 if __name__ == "__main__":
