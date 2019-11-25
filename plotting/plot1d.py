@@ -3,6 +3,7 @@
 #
 
 from . import PlotData
+from femtofitter import PathQuery
 from plotting.fitresults import MultiFitResults
 import numpy as np
 import pandas as pd
@@ -431,6 +432,105 @@ class PlotResults1D:
 
         self.fr = fr
 
-    def plot(self, centrality, kts=None):
+    def plot(self,
+             centrality,
+             kts=None,
+             pad=None,
+             canvas_size=(500, 900),
+             xmax=0.23,
+             ):
+        import ROOT
+        from ROOT import TPad, TCanvas
+
+        fitter_classmap = {
+            'Gauss1DPolyBg': 'Fitter1DGaussPolyBg',
+            'Levy1DPolyBg': 'Fitter1DLevyPolyBg',
+        }
+
         df = self.fr.df
         df = df[df.cent==centrality]
+
+        if pad is None:
+            pad = TCanvas()
+            pad.SetCanvasSize(*canvas_size)
+
+        plot = PlotData(pad)
+
+        # pad.SetFillColor(ROOT.kRed)
+        pad.SetFillColor(ROOT.kBlack)
+
+        if kts is None:
+            kts = ['0.2_0.3', '0.3_0.4']
+            kts = list(df.kt.unique())
+
+        J = len(kts)
+
+        # colors = [ROOT.kBlue, ROOT.kGreen, ROOT.kGreen+2]
+        get_color = plot.color_loader('colorblind')
+
+        TOP_BUFFER = 0.02
+        BOTTOM_BUFFER = 0.05
+        YSPACE = 0.02
+
+        canvas_height_frac = (1.0 - TOP_BUFFER - BOTTOM_BUFFER - (J - 1) * YSPACE) / J
+
+        plot.pads = []
+        plot.hists = []
+        plot.cf_data_hists = []
+        plot.lines = []
+        plot.tfiles = {}
+
+        ftr_classname = fitter_classmap[self.fr.df.iloc[0].fitter]
+        FitterClass = getattr(ROOT, ftr_classname)
+
+        for j, kt in enumerate(kts):
+            pad.cd()
+
+            yfrachi = 1.0 - TOP_BUFFER - j * (canvas_height_frac + YSPACE)
+            yfraclo = yfrachi - canvas_height_frac
+
+            subpad = TPad('pad%d' % j,
+                          '',
+                          0.05, yfraclo, 0.96, yfrachi)
+            subpad.Draw()
+            subpad.SetFillColor(get_color(kt))
+            subpad.cd()
+
+            subdf = df[df.kt==kt]
+
+            series = subdf.iloc[0]
+            pq = PathQuery.From(series)
+
+            ppath = pq.as_path()
+            fit_result = FitterClass.FitResult(series)
+            # pad.cd()
+
+            filename = self.fr.frs[0].filename
+            if filename not in plot.tfiles:
+                tfile = plot.tfiles[filename] = ROOT.TFile.Open(filename)
+
+            path = pq.as_path()
+            tdir = tfile.Get(path)
+
+            num, den = map(tdir.Get, ("num", "den"))
+            ratio = num.Clone('ratio%02d' % j)
+            ratio.Divide(num, den)
+            fit_result.Normalize(ratio)
+
+            # ratio.GetXaxis().SetRangeUser(0.14, 0.34)
+            ratio.Draw()
+
+            plot.hists.extend([num, den, ratio])
+            plot.cf_data_hists.append(ratio)
+
+            # subpad.SetLineColor(ROOT.kBlack)
+            # subpad.SetBoxlimrderMode(5)
+            # subpad.SetBorderSize(2)
+            plot.pads.append(subpad)
+
+        for hist in plot.cf_data_hists:
+            hist.GetXaxis().SetRangeUser(0.0, xmax)
+            hist.GetYaxis().SetRangeUser(0.85, 1.34)
+
+
+        return plot
