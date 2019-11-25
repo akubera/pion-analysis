@@ -99,9 +99,13 @@ RunAnalysis(TString wd="")
   gROOT->Macro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C(kTRUE, kTRUE, kTRUE)");
   gROOT->Macro("$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C");
 
-  auto *femtotask = new AliAnalysisTaskFemtoNu("femtotask", "ConfigFemtoAnalysis.C", "");
-  mgr->AddTask(femtotask);
-  femtotask->SetupContainers();
+
+  gROOT->LoadMacro("$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C");
+
+  gROOT->ProcessLine(R"(AddNuTaskPionPionRoot6("bad-pair-detect", "macro='%%/ConfigNuFemtoAnalysisR6.C+'", "+p; (0.2:0.5:1.0); ~do_mc_misident_analysis=true; @is_mc_analysis=true; ~do_kt_trueqinv_cf = true; $mc_pion_only=true;", "") )");
+  // auto *femtotask = new AliAnalysisTaskFemtoNu("femtotask", "ConfigFemtoAnalysis.C", "");
+  // mgr->AddTask(femtotask);
+  // femtotask->SetupContainers();
 
 #if false
   setup_grid(mgr, wd);
@@ -122,8 +126,8 @@ RunAnalysis(TString wd="")
 
   // for (int run_num=1; run_num<12; ++run_num) {
   // for (int run_num=1; run_num<=8; ++run_num) {
-  // for (int run_num=1; run_num<=2; ++run_num) {
-  for (int run_num=4; run_num<=6; ++run_num) {
+  for (int run_num=1; run_num<=2; ++run_num) {
+  // for (int run_num=4; run_num<=6; ++run_num) {
     input->Add(Form("/alice/sim/2016/LHC16g1a/246980/AOD/%03d/AliAOD.root", run_num));
   }
 
