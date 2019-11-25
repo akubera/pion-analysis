@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+#
+# pion-analysis/bin/fit-multi
+#
+
+from concurrent.futures.process import ProcessPoolExecutor
+import re
+import sys
+from pathlib import Path
+#import multiprocessing as mp
+import subprocess as sp
+
+
+load_python_module = __import__('__init__').load_python_module
+
+load_python_module('femtofitter', 'femtofitter/femtofitter/__init__.py')
+fit1d = load_python_module("femtofitter.bin.fit1d", "femtofitter/bin/fit-1d")
+fit3d = load_python_module("femtofitter.bin.fit3d", "femtofitter/bin/fit-3d")
+
+
+def arg_parser():
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("data_id")
+    parser.add_argument("--path",
+                        default='data')
+    parser.add_argument("--fit-1d",
+                        action='store_true')
+    parser.add_argument("--fit-3d",
+                        action='store_true')
+    return parser
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    args = arg_parser().parse_args(argv)
+    path = Path(args.path)
+
+    dataid = args.data_id
+
+    regex = re.compile(f"{dataid}-(?P<id>[0-9]+).root")
+
+    datafiles = [(str(file.absolute()), m.group('id'))
+                 for file in path.rglob(f'{dataid}*.root')
+                 if (m := regex.match(file.name))]
+
+    if args.fit_1d:
+        run_fit1d(args.data_id, datafiles)
+
+    if args.fit_3d:
+        run_fit3d(args.data_id, datafiles)
+
+    return 0
+
+
+def run_fit1d(dataid, datafiles, fitters=("Fitter1DGaussPolyBg", "Fitter1DLevyPolyBg")):
+    for filename, part in datafiles:
+        for fitter in fitters:
+            output_filename = f'fitresults/FR1D-{dataid}-{fitter}-{part}.json'
+            args = [
+                "femtofitter/bin/fit-1d", filename,
+                '--fitrange', '0.11',
+                '--fitter', fitter,
+                '--output', output_filename,
+            ]
+            sp.run(args)
+
+
+def run_fit3d(dataid, datafiles, fitters=("Fitter3DGaussLcms", "Fitter3DLevy")):
+    for filename, part in datafiles:
+        for fitter in fitters:
+            output_filename = f'fitresults/FR3D-{dataid}-{fitter}-{part}.json'
+            args = [
+                "femtofitter/bin/fit-3d", filename,
+                '--fitter', fitter,
+                '--output', output_filename,
+            ]
+            sp.run(args)
+
+
+if __name__ == "__main__":
+    exit(main())
