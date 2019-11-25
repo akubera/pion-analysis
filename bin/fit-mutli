@@ -7,7 +7,6 @@ from concurrent.futures.process import ProcessPoolExecutor
 import re
 import sys
 from pathlib import Path
-#import multiprocessing as mp
 import subprocess as sp
 
 
@@ -55,13 +54,18 @@ def main(argv=None):
 
 
 def run_fit1d(dataid, datafiles, fitters=("Fitter1DGaussPolyBg", "Fitter1DLevyPolyBg")):
+
+    mrc = 'Mrc1DRatioMixed'
+    mrc = 'Mrc1DMatrix'
+
     for filename, part in datafiles:
         for fitter in fitters:
-            output_filename = f'fitresults/FR1D-{dataid}-{fitter}-{part}.json'
+            output_filename = f'fitresults/FR1D-{dataid}-{fitter}-{mrc}-{part}.json'
             args = [
                 "femtofitter/bin/fit-1d", filename,
-                '--fitrange', '0.11',
                 '--fitter', fitter,
+                '--fitrange', '0.08',
+                '--mrc', mrc,
                 '--output', output_filename,
             ]
             sp.run(args)
