@@ -11,14 +11,12 @@ tasks:
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
       "detadphi_0", "",
-      "{0:5,20:30,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "{0:5}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
-      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=49; ~q3d_maxq=0.098;"
       "~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
       "@num_events_to_mix = 3;"
       "@enable_pair_monitors=false;"
-      "~eventreader_dca_globaltrack = 0;"
-      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
@@ -29,14 +27,12 @@ tasks:
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
       "detadphi_1", "",
-      "{0:5,20:30,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "{0:5}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
-      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=35; ~q3d_maxq=0.105;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=49; ~q3d_maxq=0.098;"
       "~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
       "@num_events_to_mix = 3;"
       "@enable_pair_monitors=false;"
-      "~eventreader_dca_globaltrack = 0;"
-      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
@@ -47,14 +43,12 @@ tasks:
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
       "detadphi_2", "",
-      "{0:5,20:30,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "{0:5}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
-      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=47; ~q3d_maxq=0.10576;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=49; ~q3d_maxq=0.098;"
       "~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
       "@num_events_to_mix = 3;"
       "@enable_pair_monitors=false;"
-      "~eventreader_dca_globaltrack = 0;"
-      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
@@ -65,14 +59,12 @@ tasks:
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
       "detadphi_3", "",
-      "{0:5,20:30,40:50}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "{0:5}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
-      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=47; ~q3d_maxq=0.10576;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=49; ~q3d_maxq=0.098;"
       "~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
       "@num_events_to_mix = 3;"
       "@enable_pair_monitors=false;"
-      "~eventreader_dca_globaltrack = 0;"
-      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
@@ -82,17 +74,49 @@ tasks:
 
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
-      "detadphi_3a", "",
-      "{20:30}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "detadphi_4", "",
+      "{0:5}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
       "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
-      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=47; ~q3d_maxq=0.10576;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=49; ~q3d_maxq=0.098;"
       "~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
       "@num_events_to_mix = 3;"
       "@enable_pair_monitors=false;"
-      "~eventreader_dca_globaltrack = 0;"
-      "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
       "$pion_1_tpc_sigma=2.0;"
-      "$pair_delta_eta_min=0.012; $pair_delta_phi_min=0.024;"
+      "$pion_1_tof_sigma=6.0;"
+      "$pair_delta_eta_min=0.025; $pair_delta_phi_min=0.04;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "detadphi_5", "",
+      "{0:5}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=49; ~q3d_maxq=0.098;"
+      "~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
+      "@num_events_to_mix = 3;"
+      "@enable_pair_monitors=false;"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tpc_sigma=2.0;"
+      "$pion_1_tof_sigma=6.0;"
+      "$pair_delta_eta_min=0.025; $pair_delta_phi_min=0.046;"
+
+  - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
+    args: |
+      "detadphi_6", "",
+      "{0:5}; (0.2:0.3:0.4:0.5:0.6:0.7:0.8:1.0:1.2);"
+      "~do_kt_qinv_cf=true; ~qinv_bin_size_MeV=2.0;"
+      "~do_kt_pqq3d_cf=true; ~q3d_bin_count=49; ~q3d_maxq=0.098;"
+      "~do_detadphistar_cf=true; ~do_avg_sep_cf=true;"
+      "@num_events_to_mix = 3;"
+      "@enable_pair_monitors=false;"
+      "$pion_1_min_tpc_chi_ndof=0.33;"
+      "$pion_1_max_tpc_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_tpc_sigma=2.0;"
+      "$pion_1_tof_sigma=6.0;"
+      "$pair_delta_eta_min=0.03; $pair_delta_phi_min=0.046;"
+
