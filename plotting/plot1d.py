@@ -571,10 +571,11 @@ class PlotResults1D:
             fitter, fit_result = build_1D_fit_pair(series, tdir, ignore_mrc)
 
             num, den = map(tdir.Get, ("num", "den"))
-            ratio = num.Clone('ratio%02d' % j)
+            ratio = num.Clone('ratio')
             ratio.Divide(num, den)
 
             fitcf = fitter.get_cf(fit_result)
+            fitcf.SetName("fithist")
             fitcf.SetLineColor(ROOT.kRed)
 
             fit_result.Normalize(ratio)
@@ -592,7 +593,7 @@ class PlotResults1D:
             plot.hists_fit.append(fitcf)
 
             kt_lbl_str = 'k_{T} = %s (GeV)' % series.kt.replace('_', '-')
-            kt_lbl = ROOT.TLatex(0.19, 0.83, kt_lbl_str)
+            kt_lbl = ROOT.TLatex(0.01, 1.33, kt_lbl_str)
             # kt_lbl = ROOT.TLatex(0.5, 0.10, kt_lbl_str)
             # kt_lbl.SetNDC()
             kt_lbl.SetTextSize(0.1)
@@ -601,6 +602,25 @@ class PlotResults1D:
             kt_lbl.Draw('same')
             plot.texts.append(kt_lbl)
 
+            fit_bits = [
+                f'R_{{inv}} = {series.radius:0.3f} #pm {series.radius_err:0.3f}',
+                f'   #lambda = {series.lam:0.3f} #pm {series.lam_err:0.3f}',
+            ]
+
+            if 'alpha' in series:
+                fit_bits.append(f'   #alpha = {series.alpha:0.3f} #pm {series.alpha_err:0.3f}')
+
+            if len(fit_bits) == 2:
+                fitlines = '#splitline{%s}{%s}' % tuple(fit_bits)
+            elif len(fit_bits) == 3:
+                fitlines = '#splitline{#splitline{%s}{%s}}{%s}' % tuple(fit_bits)
+
+            fitlbl = ROOT.TLatex(xmax * 0.95, yrange[1] * 0.93, fitlines)
+            fitlbl.SetTextAlign(33)
+            fitlbl.SetTextSize(.1)
+            fitlbl.SetTextFont(42)
+            fitlbl.Draw()
+            plot.texts.append(fitlbl)
             # subpad.SetLineColor(ROOT.kBlack)
             # subpad.SetBoxlimrderMode(5)
             # subpad.SetBorderSize(2)
@@ -620,6 +640,10 @@ class PlotResults1D:
 
         bottom_pad = plot.pads[-1]
         bottom_pad.SetBottomMargin(0.1)
+        x = bottom_pad.FindObject("ratio").GetXaxis()
+        x.SetTitle('q_{inv}')
+        x.SetTitleSize(0.8)
+        x.SetTitleOffset(0.0)
         # # print(bottom_pad.BBoxY2())
         # bbox = bottom_pad.GetBBox()
         # print('>', bbox.fX, bbox.fWidth, bbox.fY, bbox.fHeight)
