@@ -8,6 +8,7 @@ from . import PlotData
 from .systematics import calc_df_systematics
 import numpy as np
 import pandas as pd
+from itertools import chain
 from functools import lru_cache
 
 
@@ -401,14 +402,25 @@ class TheoryData:
         from pathlib import Path
         import json
 
+        check_files = [
+            "Theory-data.json",
+            "notebooks/Theory-data.json",
+            "femtofitter/Theory-data.json",
+        ]
+
         if isinstance(datafile, str):
             datafile = Path(datafile)
         elif datafile is None:
-            datafile = Path("Theory-data.json")
-            if not datafile.exists():
-                datafile = Path('notebooks/Theory-data.json')
-            if not datafile.exists():
-                datafile = Path('femtofitter/Theory-data.json')
+
+            glob_find = Path().rglob("Theory-data.json")
+            datafiles = chain(check_files, glob_find)
+
+            for datafile in map(Path, datafiles):
+                if datafile.exists():
+                    break
+            else:
+                raise FileNotFoundError("Could not find Theory-data.json")
+                datafile = Path()
 
         self.data = json.loads(datafile.read_text())
         self.saved_tlines = {}
