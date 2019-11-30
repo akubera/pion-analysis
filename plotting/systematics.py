@@ -4,6 +4,7 @@
 
 
 import pandas as pd
+import numpy as np
 
 
 def calc_df_systematics(df, keys):
@@ -12,6 +13,23 @@ def calc_df_systematics(df, keys):
         return calc_weighted_variance(df[k], df[k + "_err"])
 
     return {k: _calc_sys_err(df, k) for k in keys}
+
+
+def calc_weighted_mean(vals, errs, warn=True):
+    weights = np.power(errs, -2, where=errs>0, out=np.zeros_like(errs))
+
+    if warn and np.any(weights <= 0.0):
+        print(f"Warning: non-positive errors detected", file=sys.stderr)
+
+    if (w := weights.sum()) > 0:
+        mean_val = (vals * weights).sum() / w
+        err = w ** -0.5
+    else:
+        mean_val = vals.mean()
+        err = 0.0
+
+    return mean_val, err
+
 
 
 def calc_weighted_variance(vals, errs):

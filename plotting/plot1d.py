@@ -572,6 +572,8 @@ class PlotResults1D:
 
             num, den = map(tdir.Get, ("num", "den"))
             ratio = num.Clone('ratio')
+            if ratio.GetSumw2N() == 0:
+                ratio.Sumw2()
             ratio.Divide(num, den)
 
             fitcf = fitter.get_cf(fit_result)
@@ -586,7 +588,7 @@ class PlotResults1D:
             ratio.SetLineWidth(2)
 
             ratio.Draw('HE')
-            fitcf.Draw("SAME")
+            fitcf.Draw("SAME HIST L")
 
             plot.hists.extend([num, den, ratio])
             plot.cf_data_hists.append(ratio)
@@ -608,7 +610,8 @@ class PlotResults1D:
             ]
 
             if 'alpha' in series:
-                fit_bits.append(f'   #alpha = {series.alpha:0.3f} #pm {series.alpha_err:0.3f}')
+                fit_bits.append(f'   #alpha = {series.alpha:0.3f}'
+                                f' #pm {series.alpha_err:0.3f}')
 
             if len(fit_bits) == 2:
                 fitlines = '#splitline{%s}{%s}' % tuple(fit_bits)
@@ -653,3 +656,69 @@ class PlotResults1D:
         # print('>', bbox.fX, bbox.fWidth, bbox.fY, bbox.fHeight)
 
         return plot
+
+    def plot_results(self, df=None, **kwargs):
+        if df is None:
+            df = self.fr.df
+        else:
+            df = df
+
+        if 'alpha' in df:
+            return self.plot_levy_results(df=df, **kwargs)
+        else:
+            return self.plot_gauss_results(df=df, **kwargs)
+
+    def plot_gauss_results(self, df=None, pad=None, palette='colorblind'):
+        import ROOT
+        from ROOT import TCanvas
+        from .gauss import series_to_TGraphErrors
+        from .gauss import build_tgraphs_from_data
+        
+        if df is None:
+            df = self.fr.df.copy()
+        else:
+            df = df.copy()
+
+        if pad is None:
+            pad = TCanvas()
+        plot = PlotData(pad)
+
+        pad.Divide(2, 1)
+
+        get_cent_color = plot.color_loader(palette)
+        keys = ['radius', 'lam']
+        
+        tgraphs = build_tgraphs_from_data(df, keys=keys)
+        plot.graphs = tgraphs
+
+        tgraphs = build_tgraphs_from_data(df)
+        plot.lines = []
+        plot.x = []
+        for key in keys:
+            print(key)
+            for cent, cent_df in self.fr.df.groupby('cent'):
+                pass
+#                 for cent, kt_df in self.fr.df.groupby('cent'):
+#                 print(cent_df[key].mean(), cent_df[key + "_err"].mean())
+
+        return plot
+
+    def plot_levy_results(self, df=None, pad=None):
+        pass
+
+    def categoryplot(self, key, df=None, kts=None, cents=None):
+        import seaborn as sns
+        df = df if df is not None else self.fr.df
+        
+        if kts:
+            df = df[df.kt.isin(kts)]
+        if cents:
+            df = df[df.cent.isin(cents)]
+        
+        opts = dict(x='part:field',
+                    col='kt',
+                    row='cent',
+                    hue='pair',
+                   )
+        gf = sns.catplot(data=df, y=key, **opts)
+        return gf

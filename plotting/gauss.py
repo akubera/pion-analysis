@@ -331,7 +331,12 @@ def merge_statistical_points(df, key):
     return np.array(results).T
 
 
-def build_tgraphs_from_data(df, keys=None, skip_systematics=False, title_dict=None):
+def build_tgraphs_from_data(df,
+                            keys=None,
+                            skip_systematics=False,
+                            title_dict=None):
+    """
+    """
     from collections import defaultdict
     from ROOT import TGraphErrors
 
@@ -342,7 +347,8 @@ def build_tgraphs_from_data(df, keys=None, skip_systematics=False, title_dict=No
         title_dict = {'Ro': "R_{out}",
                       'Rs': "R_{side}",
                       'Rl': "R_{long}",
-                      'lam': "#lambda"}
+                      'lam': "#lambda",
+                      'radius': 'R_{inv}'}
 
     missing_titles = set(keys) - set(title_dict.keys())
     if missing_titles:
@@ -736,22 +742,6 @@ def AddRoutRsideRatio(df):
     df['RoRs'] = ratio
     df['RoRs_err'] = error
     return df
-
-
-def calc_weighted_mean(vals, errs, warn=True):
-    weights = np.power(errs, -2, where=errs>0, out=np.zeros_like(errs))
-
-    if warn and np.any(weights <= 0.0):
-        print(f"Warning: non-positive errors detected", file=sys.stderr)
-
-    if (w := weights.sum()) > 0:
-        mean_val = (vals * weights).sum() / w
-        err = w ** -0.5
-    else:
-        mean_val = vals.mean()
-        err = 0.0
-
-    return mean_val, err
 
 
 def merged_dataframe(df, keys, xkey='kT', skip_systematics=False):

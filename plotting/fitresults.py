@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 
 from femtofitter import FitResults
+from .systematics import calc_df_systematics, calc_weighted_mean
 
 
 class MultiFitResults:
@@ -43,6 +44,9 @@ class MultiFitResults:
             df['subset'] = ''
         else:
             df.loc[df.subset.isnull(), 'subset'] = ''
+        
+        df['pair:field'] = df.apply(lambda row: f'{row.pair}:{row.magfield}', axis=1)
+        df['part:field'] = df.apply(lambda row: f'{row.partition}:{row.magfield}', axis=1)
 
         if pd.np.any(df.duplicated()):
             raise ValueError("Paths include non-unique fit results")
@@ -127,8 +131,6 @@ class MultiFitResults:
                 keystr = f"{name}{strval}"
 
                 return [keystr] + cls.build_feature_strlist(fdict)
-            else:
-                print("Unexpected state found '*_bins' with no '*_range'.", file=sys.stderr)
 
         parts = []
 
@@ -143,26 +145,39 @@ class MultiFitResults:
 
         return parts
 
-    def add_feature_strings(self, *, inplace=False, sort=True):
+    def add_feature_strings(self, *, inplace=False, sort=True, features=None):
         if 'feature' in self.df.columns:
             return self.df
 
         feature_dict = {}
 
-        for cfg, x in self.feature_df.iterrows():
-            features = feature_dict[cfg] = {}
+        if features is not None:
+            if isinstance(features, str):
+                features = (features, )
 
-            for key, value in x.items():
-                *keypath, keyname = key.split('.')
-                featdict = features
-                for k in keypath:
-                    if k not in featdict:
-                        featdict[k] = {}
-                    featdict = featdict[k]
-                featdict[keyname] = value
+            for fr in self.frs:
+                missing_cfgs = set(fr.config.index) - set(feature_dict)
+                for cfg in missing_cfgs:
+                    series = fr.config.loc[cfg]
+                    feature_dict[cfg] = {feature_name: series[feature_name]
+                                         for feature_name in features}
 
-            # reduce ranges
-            self.range_reduce(features)
+        else:
+
+            for cfg, x in self.feature_df.iterrows():
+                features = feature_dict[cfg] = {}
+
+                for key, value in x.items():
+                    *keypath, keyname = key.split('.')
+                    featdict = features
+                    for k in keypath:
+                        if k not in featdict:
+                            featdict[k] = {}
+                        featdict = featdict[k]
+                    featdict[keyname] = value
+
+                # reduce ranges
+                self.range_reduce(features)
 
         df = self.df if inplace else self.df.copy()
 
@@ -214,5 +229,49 @@ class MultiFitResults:
     def get_features(self):
         raise NotImplementedError
 
-    def merge_dataframe(self):
-        raise NotImplementedError
+    def get_merged_dataframe(self, keys,
+                             df=None,
+                             xkey='kT',
+                             groups=['cent'],
+                             skip_systematics=False):
+        """
+        Merge dataframe rows based on centrality and k
+        """
+        
+        if df is None:
+            df = self.df
+        
+        merged_data = []
+
+#         merged_keys = [*groups, xkey]
+
+        merged_keys = ['cent', 'kT']
+        for key in keys:
+            merged_keys.append(key)
+            merged_keys.append(key + '_err')
+            if not skip_systematics:
+                merged_keys.append(key + '_sys_err')
+
+        for cent, cdf in df.groupby('cent'):
+
+            for kt, kdf in cdf.groupby(xkey):
+                values = [cent, kt]
+
+                sys_errors = (None
+                              if skip_systematics
+                              else calc_df_systematics(kdf, keys))
+
+                for key in keys:
+                    val, err = calc_weighted_mean(kdf[key], kdf[key + "_err"])
+
+                    values.append(val)
+                    values.append(err)
+
+                    if not skip_systematics:
+                        values.append(sys_errors[key])
+
+                merged_data.append(values)
+
+        return pd.DataFrame(merged_data, columns=merged_keys)
+
+
