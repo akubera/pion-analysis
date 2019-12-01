@@ -44,7 +44,7 @@ class MultiFitResults:
             df['subset'] = ''
         else:
             df.loc[df.subset.isnull(), 'subset'] = ''
-        
+
         df['pair:field'] = df.apply(lambda row: f'{row.pair}:{row.magfield}', axis=1)
         df['part:field'] = df.apply(lambda row: f'{row.partition}:{row.magfield}', axis=1)
 
@@ -237,41 +237,41 @@ class MultiFitResults:
         """
         Merge dataframe rows based on centrality and k
         """
-        
+
         if df is None:
             df = self.df
-        
-        merged_data = []
 
-#         merged_keys = [*groups, xkey]
+        grouping_keys = [groups] if isinstance(groups, str) else list(groups)
+        merged_keys = [*grouping_keys, xkey]
 
-        merged_keys = ['cent', 'kT']
         for key in keys:
             merged_keys.append(key)
             merged_keys.append(key + '_err')
             if not skip_systematics:
                 merged_keys.append(key + '_sys_err')
 
-        for cent, cdf in df.groupby('cent'):
+        merged_data = []
 
-            for kt, kdf in cdf.groupby(xkey):
-                values = [cent, kt]
+        def _recursive_add_groups(subdf, values, groupnames):
+            if groupnames:
+                for v, vdf in subdf.groupby(groupnames[0]):
+                    _recursive_add_groups(vdf, values + [v], groupnames[1:])
+                return
 
+            for x, xdf in subdf.groupby(xkey):
+                val_list = values + [x]
                 sys_errors = (None
                               if skip_systematics
-                              else calc_df_systematics(kdf, keys))
-
+                              else calc_df_systematics(xdf, keys))
                 for key in keys:
-                    val, err = calc_weighted_mean(kdf[key], kdf[key + "_err"])
-
-                    values.append(val)
-                    values.append(err)
-
+                    val, err = calc_weighted_mean(xdf[key], xdf[key + "_err"])
+                    val_list.append(val)
+                    val_list.append(err)
                     if not skip_systematics:
-                        values.append(sys_errors[key])
+                        val_list.append(sys_errors[key])
+                merged_data.append(val_list)
 
-                merged_data.append(values)
+
+        _recursive_add_groups(df, [], grouping_keys)
 
         return pd.DataFrame(merged_data, columns=merged_keys)
-
-
