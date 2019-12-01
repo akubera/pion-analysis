@@ -61,7 +61,7 @@ def run_fit1d(dataid,
 
     for filename, part in datafiles:
         for fitter in fitters:
-            output_filename = f'fitresults/FR1D-{dataid}-{fitter}-{mrc}-fr{fitrange*10:02g}-{part}.json'
+            output_filename = f'fitresults/FR1D-{dataid}-{fitter}-{mrc}-fr{fitrange*100:02g}-{part}.json'
             args = [
                 "femtofitter/bin/fit-1d", filename,
                 '--fitter', fitter,
@@ -91,7 +91,7 @@ def run_fit3d(dataid,
 
 
     for (filename, part), fitter, mrc, fitrange in things_to_fit:
-        output_filename = f'fitresults/FR3D-{dataid}-{fitter}-{mrc}-fr{fitrange*10:02g}-{part}.json'
+        output_filename = f'fitresults/FR3D-{dataid}-{fitter}-{mrc}-fr{fitrange*100:02g}-{part}.json'
         args = [
             "femtofitter/bin/fit-3d", filename,
             '--fitter', fitter,
