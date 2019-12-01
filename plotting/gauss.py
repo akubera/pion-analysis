@@ -5,7 +5,7 @@
 
 import sys
 from . import PlotData
-from .systematics import calc_df_systematics
+from .systematics import calc_df_systematics, calc_weighted_mean
 import numpy as np
 import pandas as pd
 from itertools import chain
@@ -334,6 +334,7 @@ def merge_statistical_points(df, key):
 
 def build_tgraphs_from_data(df,
                             keys=None,
+                            xkey='kT',
                             skip_systematics=False,
                             title_dict=None):
     """
@@ -349,6 +350,7 @@ def build_tgraphs_from_data(df,
                       'Rs': "R_{side}",
                       'Rl': "R_{long}",
                       'lam': "#lambda",
+                      'alpha': "#alpha",
                       'radius': 'R_{inv}'}
 
     missing_titles = set(keys) - set(title_dict.keys())
@@ -358,7 +360,7 @@ def build_tgraphs_from_data(df,
     def _merge_points(df, key):
         results = []
 
-        for kt, data in df.groupby('kT'):
+        for kt, data in df.groupby(xkey):
             errs = np.array(data[key + '_err'])
             weights = errs ** -2
             val = (data[key] * weights).sum() / weights.sum()
@@ -369,7 +371,7 @@ def build_tgraphs_from_data(df,
 
     graphs = defaultdict(dict)
 
-    for cent, cdf in df.sort_values('kT').groupby('cent'):
+    for cent, cdf in df.sort_values(xkey).groupby('cent'):
 
         for r in keys:
             x = []
@@ -392,7 +394,7 @@ def build_tgraphs_from_data(df,
                 sys_err = np.array(cdf[sys_key])
 
                 gsys = TGraphErrors(x.size)
-                np.frombuffer(gsys.GetX(), dtype=np.float64)[:] = x - 0.004
+                np.frombuffer(gsys.GetX(), dtype=np.float64)[:] = x # - 0.004
                 np.frombuffer(gsys.GetY(), dtype=np.float64)[:] = y
                 np.frombuffer(gsys.GetEY(), dtype=np.float64)[:] = sys_err
                 np.frombuffer(gsys.GetEX(), dtype=np.float64)[:] = 0.012

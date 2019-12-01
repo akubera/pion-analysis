@@ -31,7 +31,6 @@ def calc_weighted_mean(vals, errs, warn=True):
     return mean_val, err
 
 
-
 def calc_weighted_variance(vals, errs):
     weights = errs ** -2
 
