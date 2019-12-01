@@ -7,6 +7,7 @@ from concurrent.futures.process import ProcessPoolExecutor
 import re
 import sys
 from pathlib import Path
+from itertools import product
 import subprocess as sp
 
 
@@ -46,34 +47,59 @@ def main(argv=None):
     return 0
 
 
-def run_fit1d(dataid, datafiles, fitters=("Fitter1DGaussPolyBg", "Fitter1DLevyPolyBg")):
+def run_fit1d(dataid,
+              datafiles,
+              fitrange=0.08,
+              fitters=("Fitter1DGaussPolyBg", "Fitter1DLevyPolyBg"),
+             ):
 
     mrc = 'Mrc1DRatioMixed'
-    mrc = 'Mrc1DMatrix'
+    # mrc = 'Mrc1DMatrix'
+    # mrc = 'NoMrc'
+
+    fitrange = 0.08
 
     for filename, part in datafiles:
         for fitter in fitters:
-            output_filename = f'fitresults/FR1D-{dataid}-{fitter}-{mrc}-{part}.json'
+            output_filename = f'fitresults/FR1D-{dataid}-{fitter}-{mrc}-fr{fitrange*10:02g}-{part}.json'
             args = [
                 "femtofitter/bin/fit-1d", filename,
                 '--fitter', fitter,
-                '--fitrange', '0.08',
+                '--fitrange', '%s' % fitrange,
                 '--mrc', mrc,
                 '--output', output_filename,
             ]
             sp.run(args)
 
 
-def run_fit3d(dataid, datafiles, fitters=("Fitter3DGaussLcms", "Fitter3DLevy")):
-    for filename, part in datafiles:
-        for fitter in fitters:
-            output_filename = f'fitresults/FR3D-{dataid}-{fitter}-{part}.json'
-            args = [
-                "femtofitter/bin/fit-3d", filename,
-                '--fitter', fitter,
-                '--output', output_filename,
-            ]
-            sp.run(args)
+def run_fit3d(dataid,
+              datafiles,
+              fitranges=(0.08,),
+              fitters=("Fitter3DGaussLcms", "Fitter3DLevy"),
+              mrcs=('Mrc3DRatioMixed', )
+             ):
+    
+
+    if isinstance(mrcs, str):
+        mrcs = (mrcs, )
+    if isinstance(fitters, str):
+        fitters = (fitters, )
+    if isinstance(fitranges, (float, int, str)):
+        fitranges = (float(fitranges), )
+
+    things_to_fit = product(datafiles, fitters, mrcs, fitranges)
+
+
+    for (filename, part), fitter, mrc, fitrange in things_to_fit:
+        output_filename = f'fitresults/FR3D-{dataid}-{fitter}-{mrc}-fr{fitrange*10:02g}-{part}.json'
+        args = [
+            "femtofitter/bin/fit-3d", filename,
+            '--fitter', fitter,
+            '--fitrange', '%s' % fitrange,
+            '--mrc', mrc,
+            '--output', output_filename,
+        ]
+        sp.run(args)
 
 
 if __name__ == "__main__":
