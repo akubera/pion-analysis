@@ -472,11 +472,12 @@ def plot_projected_fits(fr,
 
 
 class PlotResults1D:
+    """
+    """
 
     def __init__(self, fr):
         if not isinstance(fr, MultiFitResults):
             fr = MultiFitResults(fr)
-
         self.fr = fr
 
     def plot(self,
@@ -579,13 +580,14 @@ class PlotResults1D:
             fitcf = fitter.get_cf(fit_result)
             fitcf.SetName("fithist")
             fitcf.SetLineColor(ROOT.kRed)
+            fitcf.SetLineWidth(1)
 
             fit_result.Normalize(ratio)
             fit_result.Normalize(fitcf)
             ratio.SetDirectory(nullptr)
             fitcf.SetDirectory(nullptr)
 
-            ratio.SetLineWidth(2)
+            # ratio.SetLineWidth(2)
 
             ratio.Draw('HE')
             fitcf.Draw("SAME HIST L")
@@ -631,7 +633,6 @@ class PlotResults1D:
 
             plot.hists = []
 
-
         for hist in plot.cf_data_hists:
             xax, yax = hist.GetXaxis(), hist.GetYaxis()
             xax.SetRangeUser(0.0, xmax)
@@ -647,6 +648,7 @@ class PlotResults1D:
         x.SetTitle('q_{inv}')
         x.SetTitleSize(0.8)
         x.SetTitleOffset(0.0)
+
         # # print(bottom_pad.BBoxY2())
         # bbox = bottom_pad.GetBBox()
         # print('>', bbox.fX, bbox.fWidth, bbox.fY, bbox.fHeight)
@@ -668,38 +670,68 @@ class PlotResults1D:
         else:
             return self.plot_gauss_results(df=df, **kwargs)
 
-    def plot_gauss_results(self, df=None, pad=None, palette='colorblind'):
+    def plot_gauss_results(self,
+                           df=None,
+                           pad=None,
+                           xshift=0.04,
+                           palette='colorblind'):
         import ROOT
         from ROOT import TCanvas
         from .gauss import series_to_TGraphErrors
         from .gauss import build_tgraphs_from_data
-        
+
         if df is None:
             df = self.fr.df.copy()
         else:
             df = df.copy()
 
+        keys = ['radius', 'lam']
+        df = self.fr.get_merged_dataframe(keys=keys, df=df)
+
         if pad is None:
             pad = TCanvas()
+            pad.SetCanvasSize(800, 400)
+
         plot = PlotData(pad)
 
         pad.Divide(2, 1)
 
         get_cent_color = plot.color_loader(palette)
-        keys = ['radius', 'lam']
-        
+
         tgraphs = build_tgraphs_from_data(df, keys=keys)
         plot.graphs = tgraphs
 
-        tgraphs = build_tgraphs_from_data(df)
+        plot.axhists = {
+            'radius':  ROOT.TH1C("rinv_axes", "", 1000, 0.2, 1.2),
+            'lam':  ROOT.TH1C("lam_axes", "", 1000, 0.2, 1.2),
+        }
+        plot.axhists['radius'].GetYaxis().SetRangeUser(1.4, 8.4)
+        plot.axhists['lam'].GetYaxis().SetRangeUser(0.0, 0.6)
+
+        tgraphs = build_tgraphs_from_data(df, keys=keys)
+        plot.tgraphs = tgraphs
         plot.lines = []
-        plot.x = []
-        for key in keys:
-            print(key)
-            for cent, cent_df in self.fr.df.groupby('cent'):
-                pass
-#                 for cent, kt_df in self.fr.df.groupby('cent'):
-#                 print(cent_df[key].mean(), cent_df[key + "_err"].mean())
+
+        for i, key in enumerate(keys, 1):
+            pad.cd(i)
+            plot.axhists[key].Draw()
+
+            x_shift = xshift
+            for cent, cent_tgraph in tgraphs[key].items():
+                color = get_cent_color(cent)
+
+                tgraph, sys_tgraph = cent_tgraph
+                tgraph.SetLineColor(color)
+                tgraph.SetMarkerColor(color)
+                tgraph.SetMarkerStyle(21)
+                tgraph.SetMarkerSize(1)
+
+                if sys_tgraph:
+                    sys_tgraph.SetLineColor(color)
+                    sys_tgraph.SetFillColorAlpha(color, 0.25)
+                    sys_tgraph.Draw('SAME E5 P')
+
+                tgraph.Draw('SAME P')
 
         return plot
 
@@ -709,12 +741,12 @@ class PlotResults1D:
     def categoryplot(self, key, df=None, kts=None, cents=None):
         import seaborn as sns
         df = df if df is not None else self.fr.df
-        
+
         if kts:
             df = df[df.kt.isin(kts)]
         if cents:
             df = df[df.cent.isin(cents)]
-        
+
         opts = dict(x='part:field',
                     col='kt',
                     row='cent',
