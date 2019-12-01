@@ -701,9 +701,11 @@ class PlotResults1D:
         tgraphs = build_tgraphs_from_data(df, keys=keys)
         plot.graphs = tgraphs
 
+        x_range = (0.1, 1.2)
+
         plot.axhists = {
-            'radius':  ROOT.TH1C("rinv_axes", "", 1000, 0.2, 1.2),
-            'lam':  ROOT.TH1C("lam_axes", "", 1000, 0.2, 1.2),
+            'radius':  ROOT.TH1C("rinv_axes", "", 1000, *x_range),
+            'lam':  ROOT.TH1C("lam_axes", "", 1000, *x_range),
         }
         plot.axhists['radius'].GetYaxis().SetRangeUser(1.4, 8.4)
         plot.axhists['lam'].GetYaxis().SetRangeUser(0.0, 0.6)
@@ -716,7 +718,9 @@ class PlotResults1D:
             pad.cd(i)
             plot.axhists[key].Draw()
 
-            x_shift = xshift
+            x_shift_w = xshift * 2 / len(tgraphs[keys])
+            x_shift = -xshift
+
             for cent, cent_tgraph in tgraphs[key].items():
                 color = get_cent_color(cent)
 
@@ -725,6 +729,11 @@ class PlotResults1D:
                 tgraph.SetMarkerColor(color)
                 tgraph.SetMarkerStyle(21)
                 tgraph.SetMarkerSize(1)
+
+                shift = x_shift
+                x_shift += x_shift_w
+
+                np.frombuffer(tgraph.GetX(), dtype=np.float64)[:] = shift
 
                 if sys_tgraph:
                     sys_tgraph.SetLineColor(color)
@@ -735,7 +744,83 @@ class PlotResults1D:
 
         return plot
 
-    def plot_levy_results(self, df=None, pad=None):
+    def plot_levy_results(self,
+                           df=None,
+                           pad=None,
+                           xshift=0.03,
+                           palette='colorblind'):
+        import ROOT
+        from ROOT import TCanvas
+        from .gauss import series_to_TGraphErrors
+        from .gauss import build_tgraphs_from_data
+
+        if df is None:
+            df = self.fr.df.copy()
+        else:
+            df = df.copy()
+
+        keys = ['radius', 'lam', 'alpha']
+        df = self.fr.get_merged_dataframe(keys=keys, df=df)
+
+        if pad is None:
+            pad = TCanvas()
+            pad.SetCanvasSize(900, 400)
+
+        plot = PlotData(pad)
+
+        pad.Divide(3, 1)
+
+        get_cent_color = plot.color_loader(palette)
+
+        tgraphs = build_tgraphs_from_data(df, keys=keys)
+        plot.graphs = tgraphs
+
+        x_range = 0.1, 1.2
+        plot.axhists = {
+            'radius':  ROOT.TH1C("rinv_axes", "", 1000, *x_range),
+            'lam':  ROOT.TH1C("lam_axes", "", 1000, *x_range),
+            'alpha':  ROOT.TH1C("alpha_axes", "", 1000, *x_range),
+        }
+        plot.axhists['radius'].GetYaxis().SetRangeUser(1.4, 28.4)
+        plot.axhists['lam'].GetYaxis().SetRangeUser(0.0, 1.6)
+        plot.axhists['alpha'].GetYaxis().SetRangeUser(0.0, 3.6)
+
+        tgraphs = build_tgraphs_from_data(df, keys=keys)
+        plot.tgraphs = tgraphs
+        plot.lines = []
+
+        for i, key in enumerate(keys, 1):
+            pad.cd(i)
+            plot.axhists[key].Draw()
+
+            x_shift_w = xshift * 2 / len(tgraphs[key])
+            x_shift = -xshift
+
+            for cent, cent_tgraph in tgraphs[key].items():
+                color = get_cent_color(cent)
+
+                tgraph, sys_tgraph = cent_tgraph
+                tgraph.SetLineColor(color)
+                tgraph.SetMarkerColor(color)
+                tgraph.SetMarkerStyle(21)
+                tgraph.SetMarkerSize(1)
+
+                shift = x_shift
+                x_shift += x_shift_w
+
+                np.frombuffer(tgraph.GetX(), dtype=np.float64)[:] += shift
+
+                if False and sys_tgraph:
+                    sys_tgraph.SetLineColor(color)
+                    sys_tgraph.SetFillColorAlpha(color, 0.25)
+                    sys_tgraph.Draw('SAME E5 P')
+                    np.frombuffer(sys_tgraph.GetX(), dtype=np.float64)[:] = shift
+
+                tgraph.Draw('SAME P')
+
+        return plot
+
+    def plot_results(self, keys):
         pass
 
     def categoryplot(self, key, df=None, kts=None, cents=None):
