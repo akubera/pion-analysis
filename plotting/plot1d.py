@@ -666,8 +666,10 @@ class PlotResults1D:
             df = df
 
         if 'alpha' in df:
+#             kwargs.setdefault('keys', ('radius', 'lam', 'alpha'))
             return self.plot_levy_results(df=df, **kwargs)
         else:
+#             kwargs.setdefault('keys', ('radius', 'lam'))
             return self.plot_gauss_results(df=df, **kwargs)
 
     def plot_gauss_results(self,
@@ -718,7 +720,7 @@ class PlotResults1D:
             pad.cd(i)
             plot.axhists[key].Draw()
 
-            x_shift_w = xshift * 2 / len(tgraphs[keys])
+            x_shift_w = xshift * 2 / len(tgraphs[key])
             x_shift = -xshift
 
             for cent, cent_tgraph in tgraphs[key].items():
@@ -733,12 +735,13 @@ class PlotResults1D:
                 shift = x_shift
                 x_shift += x_shift_w
 
-                np.frombuffer(tgraph.GetX(), dtype=np.float64)[:] = shift
+                np.frombuffer(tgraph.GetX(), dtype=np.float64)[:] += shift
 
                 if sys_tgraph:
                     sys_tgraph.SetLineColor(color)
                     sys_tgraph.SetFillColorAlpha(color, 0.25)
                     sys_tgraph.Draw('SAME E5 P')
+                    np.frombuffer(sys_tgraph.GetX(), dtype=np.float64)[:] += shift
 
                 tgraph.Draw('SAME P')
 
@@ -810,18 +813,15 @@ class PlotResults1D:
 
                 np.frombuffer(tgraph.GetX(), dtype=np.float64)[:] += shift
 
-                if False and sys_tgraph:
+                if sys_tgraph:
                     sys_tgraph.SetLineColor(color)
                     sys_tgraph.SetFillColorAlpha(color, 0.25)
                     sys_tgraph.Draw('SAME E5 P')
-                    np.frombuffer(sys_tgraph.GetX(), dtype=np.float64)[:] = shift
+                    np.frombuffer(sys_tgraph.GetX(), dtype=np.float64)[:] += shift
 
                 tgraph.Draw('SAME P')
 
         return plot
-
-    def plot_results(self, keys):
-        pass
 
     def categoryplot(self, key, df=None, kts=None, cents=None):
         import seaborn as sns
