@@ -10,13 +10,6 @@ from pathlib import Path
 import subprocess as sp
 
 
-load_python_module = __import__('__init__').load_python_module
-
-load_python_module('femtofitter', 'femtofitter/femtofitter/__init__.py')
-fit1d = load_python_module("femtofitter.bin.fit1d", "femtofitter/bin/fit-1d")
-fit3d = load_python_module("femtofitter.bin.fit3d", "femtofitter/bin/fit-3d")
-
-
 def arg_parser():
     from argparse import ArgumentParser
     parser = ArgumentParser()
