@@ -56,30 +56,22 @@ def deserialize_args(args: str) -> Tuple:
 
 
 @lru_cache()
-def load_fsi(fitter, fsi_str):
-#     fsi_objs = {}
-    # m = re.match(f"(?P<classname>\w+)\[(?P<filename>[^\]]+)\]", fsi)
-    # FsiClass = getattr(ROOT, m.group('classname'))
-#     fitter.fsi = FsiClass.From(m.group('filename'))
-#     for fsi in fsi_paths:
+def build_fsi_obj(fsi_str: str, shared_ptr: bool=True):
     m = re.match(r'(?P<cls>\w+)\[(?P<args>[^\]]+)\]', fsi_str)
     if not m:
         raise ValueError(f"Could not parse fsi string: {fsi_str!r}")
-
     import ROOT
-#     filename = m.group('file')
-    # if filename not in file_cache:
-    #    file_cache[filename] = TFile.Open(filename)
-
-    #fsi_file = file_cache[filename]
-#     fsi_file = TFile.Open(filename)
-
     FsiClass = getattr(ROOT, m.group('cls'))
     fsi_args = deserialize_args(m.group('args'))
+    if shared_ptr:
+        return FsiClass.From(*fsi_args)
+    else:
+        return FsiClass(*fsi_args)
 
-#     fsi_objs[fsi] = fsi_cls.From(fsi_file)
 
-    fitter.fsi = FsiClass.From(*fsi_args)
+@lru_cache()
+def load_fsi(fitter, fsi_str: str) -> None:
+    fitter.fsi = build_fsi_obj(fsi_str)
 
 
 @lru_cache()
@@ -120,6 +112,7 @@ def plot_fit_projections(fitresult,
                          fclassname=None,
                          ignore_mrc=False,
                          pad=None,
+                         canvas_size=(700, 1200),
                          integration=0.05):
     import re
     import ROOT
@@ -166,6 +159,7 @@ def plot_fit_projections(fitresult,
 
     if pad is None:
         pad = TCanvas()
+        pad.SetCanvasSize(*canvas_size)
 
     rows = [row for _, row in df.iterrows()]
 
