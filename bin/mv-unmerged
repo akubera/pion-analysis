@@ -151,7 +151,7 @@ def run_remove(grid_path, args):
 
         cp_cmd = ['alien_cp',
                   f'alien:/{src}/root_archive.zip',
-                  f'alien:/{dest}/']
+                  f'alien:/{dest}/root_archive.zip']
 
         cp_cmd = run(cp_cmd, stderr=sp.PIPE)
         cp_stdout, cp_stderr = cp_cmd.communicate()
