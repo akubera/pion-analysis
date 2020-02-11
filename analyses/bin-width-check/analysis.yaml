@@ -1,8 +1,8 @@
 ---
-aliphysics-version: "vAN-20190920_ROOT6-1"
+aliphysics-version: "vAN-20200202_ROOT6-1"
 max-input-files: 60
-max-merge-files: 15
-ttl: "14 * 3600"
+max-merge-files: 20
+ttl: "18 * 3600"
 
 tasks:
   - macro: '$ALICE_ROOT/ANALYSIS/macros/train/AddAODHandler.C'
@@ -15,11 +15,12 @@ tasks:
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=75; ~q3d_maxq=0.1125;"
       "~eventreader_dca_globaltrack = 0;"
       "@num_events_to_mix = 4;"
+      "@enable_pair_monitors=false;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_sigma=2.0;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
-      "$pion_1_max_its_chi_ndof=1.8;"
+      "$pion_1_max_its_chi_ndof=2.8;"
 
   - macro: '$ALICE_PHYSICS/PWGCF/FEMTOSCOPY/macros/Train/PionPionFemto/AddNuTaskPionPionRoot6.C+'
     args: |
@@ -28,6 +29,7 @@ tasks:
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=45; ~q3d_maxq=0.1125;"
       "~eventreader_dca_globaltrack = 0;"
       "@num_events_to_mix = 4;"
+      "@enable_pair_monitors=false;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_sigma=2.0;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
@@ -41,6 +43,7 @@ tasks:
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=33; ~q3d_maxq=0.1155;"
       "~eventreader_dca_globaltrack = 0;"
       "@num_events_to_mix = 4;"
+      "@enable_pair_monitors=false;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_sigma=2.0;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
@@ -54,8 +57,10 @@ tasks:
       "~do_kt_pqq3d_cf=true; ~q3d_bin_count=27; ~q3d_maxq=0.1350;"
       "~eventreader_dca_globaltrack = 0;"
       "@num_events_to_mix = 4;"
+      "@enable_pair_monitors=false;"
       "$pion_1_max_impact_xy=1.5; $pion_1_max_impact_z=1.6;"
       "$pion_1_sigma=2.0;"
       "$pion_1_min_tpc_chi_ndof=0.33;"
       "$pion_1_max_tpc_chi_ndof=1.8;"
       "$pion_1_max_its_chi_ndof=1.8;"
+
