@@ -184,10 +184,9 @@ def run_remove(grid_path, args):
     MOVE_PREFIX = 'X'
     STAGEMOVE_PREFIX = 'S'
 
-    for path in new_dir_paths:
+    for path in tqdm(new_dir_paths):
         relpath = path.relative_to(grid_path)
         dest = dest_root / f'{MOVE_PREFIX}{relpath.parts[0]}'
-        print(path, '->', dest)
         alien_mv(path, dest)
 
     if current_merge_stage != 1 and not args.stages:
